@@ -245,9 +245,12 @@ SETTLER_TYPES = {
     "水蛇": {"max_age": 150, "daily_food": {"鲫鱼": 1, "青蛙": 0.5}},
     "野鸭": {"max_age": 180, "daily_food": {"浮萍": 3, "孑孓": 2},
             "detritus_per_day": 2.0, "nutrients_per_day": 1.0},
-    # 访客变常驻
-    "翠鸟": {"max_age": 200, "daily_food": {"鲫鱼": 1}, "prob_food": 0.6},
-    "苍鹭": {"max_age": 180, "daily_food": {"鲫鱼": 2, "泥鳅": 1},
+    # 访客变常驻 —— 捕食型定居者（hunter）：按概率捕食，详见 _process_settlers
+    #   每天 40% 安静（不出现在描写中），60% 触发捕食尝试；
+    #   尝试成功率 40%（猎物总数 < 5 时降为 20%）；
+    #   成功扣 1 猎物 + health 恢复 0.1；连续 5 天无成功才 health 每天 -0.05。
+    "翠鸟": {"max_age": 200, "hunter": {"prey": ["鲫鱼"]}},
+    "苍鹭": {"max_age": 180, "hunter": {"prey": ["鲫鱼", "泥鳅"]},
             "on_settle_flag": "heron_resident"},
 }
 
@@ -295,14 +298,33 @@ SETTLER_TEXT = {
     },
 }
 
-# 翠鸟定居者捕食成功 / 失败文案
+# 翠鸟定居者捕食成功 / 失败文案（各 5 套）
 KINGFISHER_HIT = [
     "翠鸟俯冲入水，叼出一条鲫鱼，鱼尾在它喙里甩了几下便不再动了。",
     "水面炸开一圈水花，翠鸟衔着鱼回到枝头，仰头将鱼顺进喉咙。",
+    "翠鸟从芦苇秆上弹射出去，翅膀收拢，像一颗蓝石子砸进水里。出水时喙间已经夹着一条扭动的银光。",
+    "它盘旋了半圈，锁定目标，俯冲的弧线划破水面。溅起的碎光还没落下，翠鸟已经叼着鱼冲回半空。",
+    "冬日的水面格外安静。翠鸟从枯枝上无声地坠下去，破开薄冰，衔出一条鲫鱼。冰碴挂在它喙边，闪着冷光。",
 ]
 KINGFISHER_MISS = [
     "翠鸟扎进水里，又空空地窜回来，抖掉羽上的水珠，重新盯住水面。",
     "它扑了个空。水花散去，翠鸟落在枝头，偏了偏头，像是没想明白。",
+    "水太浑了。翠鸟在枝头偏了好几次头，看不清鱼在哪里，最终放弃了这次俯冲。",
+    "翠鸟扎下去，喙尖触到鱼尾，滑了。它窜出水面时嘴里空空，站在枝上抖了很久的水。",
+    "它在枝头犹豫了一瞬。就是那一瞬，鱼影沉进了深水，水面恢复平静。翠鸟收紧了爪子，没有动。",
+]
+
+# 苍鹭定居者捕食成功 / 失败文案
+HERON_HIT = [
+    "苍鹭在浅水里站成了一截枯木。很久。然后长喙刺下去，水面炸开，一条泥鳅被夹了出来。",
+    "它慢慢在岸边走动，长腿抬得极缓。突然停住，颈子绷成弓，喙入水中——一条鲫鱼被横着衔了出来。",
+    "黄昏的光里，苍鹭站在深水与浅水的交界处，一动不动。出击只有一次。水花溅起，鱼已经在它喙里了。",
+    "苍鹭换了一个位置，又换了一个位置。第三个位置它只等了一小会儿，长喙就扎进了水里，叼起一条扭动的泥鳅。",
+    "晨光刚照到水面，苍鹭已经站在浅水里了。它的影子很长。鱼游进影子里的时候，被喙钉住了。",
+]
+HERON_MISS = [
+    "苍鹭在浅水里站了很久，长喙始终没有刺下去。水里没有鱼经过。它慢慢收拢翅膀，飞远了。",
+    "浅水区空空荡荡。苍鹭换了几处位置，最终还是展开宽大的翅膀，朝别处飞去了。",
 ]
 
 # ---------------------------------------------------------------------------
@@ -686,29 +708,47 @@ LOOK_DESC = {
     "水蚯蚓": "分解者，在淤泥里蠕动，加速碎屑分解。碎屑越多，它们越多。",
 }
 
+# look 定居者时展示的习性描述（item 30）
+SETTLER_HABIT = {
+    "流浪乌龟": "缓慢的底栖住客，啃水藻、偶尔捞条小鱼，晒太阳是正经事。",
+    "螃蟹": "横行水底，翻石头找食，搅起泥沙让水变浑。",
+    "水蛇": "芦苇丛里最安静的猎手，吃鱼也吃蛙；它在时田鼠不敢出洞。",
+    "野鸭": "终年游弋的一对，吃浮萍和孑孓，粪便会让水底碎屑增多。",
+    "翠鸟": "枯枝上的蓝色弹射手，俯冲入水捕鲫鱼，捕到才长膘。",
+    "苍鹭": "浅水里的伏击者，长喙一刺，鲫鱼泥鳅都难逃；它定居后鱼群学会了躲藏。",
+}
+
 # gaze 主体候选顺序（实际按在场随机抽取，不依赖顺序）
 GAZE_SUBJECT_ORDER = list(GAZE_SUBJECT.keys())
 
 GAZE_SETTLER = {
     "流浪乌龟": [
-        "乌龟在角落慢慢啃食水藻，壳上映着水光。",
-        "它趴在半露的石上，伸长脖子，四望。",
-        "四肢划水，圆壳慢慢没入暗处。",
+        "乌龟趴在半露出水面的石头上，脖子伸得老长，一动不动地晒着太阳。",
+        "它慢吞吞地啃着石面上的水藻，一下一下，石头露出一小块干净的灰白。",
+        "乌龟把头缩进壳里，四爪也收了进去。水面荡过来一圈涟漪，它只是轻轻晃了一下。",
+        "乌龟在水底慢慢爬过，壳擦过石块，发出一声轻闷的响。泥沙在它身后微微扬起又沉降。",
+        "水面破开，乌龟探出头来换气，鼻子露了一下又沉下去，留下几圈逐渐扩大的圆纹。",
     ],
     "螃蟹": [
-        "螃蟹从石缝里横着挪出来，一只大钳子拖在身后，另一只举在前面。",
-        "螃蟹翻开一块石头，底下的泥鳅慌忙窜出，又被螃蟹的钳子吓了回去。",
-        "它在水底横行，搅起一小片泥沙，又停下来，吐出一串气泡。",
+        "螃蟹从石缝里横着挪出来，一只大钳子举在前面，像在试探风向。",
+        "它翻开一块小石头，底下的淤泥露出来。螃蟹在泥里翻找了一会儿，又横着挪向下一块石头。",
+        "螃蟹挥起大钳子，对着一条凑太近的泥鳅虚张声势。泥鳅扭身逃开，螃蟹慢慢放下了钳子。",
+        "它在水底挖出一个浅浅的坑，把自己嵌进去，只露出两只柄眼和一个吐着泡泡的嘴。",
+        "一串细密的气泡从石缝里冒上来。螃蟹正在底下清理自己的壳，钳子够到背上，一下一下地刮。",
     ],
     "水蛇": [
-        "水蛇盘在芦苇根部，头枕在自己的身体上，鳞片微微起伏。",
-        "一条水蛇悄无声息地切开水面，头探向岸边，又慢慢收回去。",
-        "芦苇丛里，水蛇正蜕下旧皮，半透明的蛇蜕挂在枯茎上轻轻晃动。",
+        "水蛇盘在芦苇根部，头枕在自己的身体上。鳞片在斜阳里泛着湿润的暗光。",
+        "一道细长的波纹划过水面，水蛇的头探出来，又沉下去，留下一道渐渐消散的水痕。",
+        "水蛇把自己摊在岸边一块晒暖的石头上，全身舒展，鳞片慢慢变干，颜色浅了一层。",
+        "芦苇丛里，半透明的蛇蜕挂在枯茎上轻轻晃动。不远处，水蛇换了一身新鳞，安静地蜷着。",
+        "水蛇的下颌张开，慢慢吞下一只青蛙。吞了很久。然后它缓缓滑入水中，身体鼓着一个缓慢移动的结。",
     ],
     "野鸭": [
-        "一对野鸭并排游过水面，颈子一前一后地摆动，身后留下两道展开的波纹。",
-        "野鸭把头埋进水里，尾巴朝天翘起，过了一会儿才甩着水珠冒出来。",
-        "芦苇丛边，母鸭伏在巢上，公鸭在附近慢慢游着，像在站岗。",
+        "一对野鸭并排游过水面，颈子一前一后地摆动，身后两道波纹渐渐合成一片。",
+        "野鸭把头埋进水里，尾巴朝天翘起，蹬了两下蹼才冒出来，甩出一圈晶亮的水珠。",
+        "芦苇丛边的巢上，母鸭伏着一动不动，只有眼睛在慢慢眨。公鸭在附近的水面上慢慢游着。",
+        "野鸭站在岸边，扭过头用喙梳理翅膀下的羽毛，一根一根地理，阳光把它颈上的绿斑照得发亮。",
+        "两只野鸭同时拍打翅膀，在水面上踩出一串水花，然后收了翅，抖抖身子，重新浮在水上。",
     ],
     "翠鸟": [
         "翠鸟蹲在枯枝上，缩着脖子，羽毛被逆光打出一圈蓝边。",
@@ -728,6 +768,157 @@ GAZE_EMPTY = [
     "水如镜，深处沉默，还在等第一个住客。",
 ]
 
+# 冬季青蛙冬眠时的凝视描写（不描写活动，只写"泥底下埋着冬眠的青蛙"）
+GAZE_HIBERNATE = [
+    "岸边的泥底下，埋着几只冬眠的青蛙，一动不动，只等开春。",
+    "淤泥深处，冬眠的青蛙缩成一团，呼吸慢得几乎停了。",
+    "泥层底下藏着越冬的青蛙，皮肤贴着冷泥，做着漫长的梦。",
+]
+
+# ---------------------------------------------------------------------------
+# 2f. observe 动态主描写模板（按当前最显著状态优先选择，每类至少 3 套）
+# ---------------------------------------------------------------------------
+
+OBSERVE_AMBIENT = {
+    "high_cover": [
+        "浮萍盖满水面，底下的世界陷入幽绿的昏暗。光线只能从几处缝隙漏下去，在水底投下细小的光斑。",
+        "水面被绿毯封死了。看不见鱼，看不见水底，只有浮萍在微风中轻轻挤在一起。",
+        "厚厚一层浮萍，风也吹不开。水下安静得发闷，偶尔有一个气泡从缝隙里艰难地挤出来。",
+    ],
+    "low_do": [
+        "水面浮着一层细密的气泡，水色暗沉。几条鲫鱼把嘴探出水面，急促地张合。",
+        "水底像是积着一口浊气。水草有气无力地垂着，田螺缩进壳里，一动不动。",
+        "池塘很闷。连水蚤都升到了近水面，密密麻麻挤在氧气稍微多一点的那一层。",
+    ],
+    "high_nutrients": [
+        "水色发绿，浓得有些黏稠。光线只能穿进一半，水底模糊不清。",
+        "水藻疯长，绿丝缠成一团一团，在微风中轻轻拉扯，像是在抢夺每一寸水面。",
+        "池水绿得不正常，带着一股生腥气。水草上挂满了黏糊糊的绿絮，随波晃动。",
+    ],
+    "high_detritus": [
+        "水底积着一层厚厚的腐叶，踩上去会陷进去。腐气从淤泥里冒出，在水面碎成细密的气泡。",
+        "池塘底上黏糊糊的，碎屑堆积成团，水蚯蚓在底下蠕动，密密麻麻的红丝时隐时现。",
+        "水面漂着碎叶和半腐的草茎，水色发黄。搅一搅，沉底的碎屑就翻上来，把水弄得更浑。",
+    ],
+    "biodiverse": [
+        "池塘从来没有这样热闹过。从水底到水面，每一层都有生命在忙碌，像一座运转起来的小城。",
+        "水面有鱼群游动，水底有螺在爬，岸边草丛里有响动——池塘活了，每一个角落都挤着生命。",
+        "眼睛不知道往哪里看才好。水蚤在光柱里跳动，鲫鱼在水草间穿梭，远处还有野鸭划开水面。",
+    ],
+    "settler": [
+        "那只乌龟趴在老位置上，闭着眼，像是在池塘的喧嚣里找到了唯一的静处。",
+        "枯枝上蹲着那道蓝影。翠鸟守着池塘，已经像守着它自己的领地。",
+        "苍鹭站在浅水里，长颈微曲。它不动，整个池塘的时间都跟着慢了半拍。",
+    ],
+    "default": [
+        "水面平静，光线在水底缓缓移动，一切都按着自己的节奏走着。",
+        "池塘安静地呼吸着。没有大事发生，只有细小的生命在各自的角落里忙碌。",
+        "天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地运转。",
+    ],
+}
+
+# 灾害进行中的 observe 专属描写（按持续天气类型选择）
+WEATHER_ONGOING = {
+    "干旱": [
+        "水位已经退下去一大截，泥岸干裂出密密的纹路。池塘还在一天天缩小。",
+        "泥岸上的裂缝越来越宽，水线以下的石头露了出来，上面晒着干掉的螺壳。",
+        "水越来越浅，鱼群挤在池塘中央那一小片深水里，已经没有多少地方可以游了。",
+    ],
+    "热浪": [
+        "水面蒸着薄薄的热气，水温高得发黏，鱼都沉在最深的阴影里。",
+        "连蝉都不叫了。水面纹丝不动，蒸腾的水汽让远处的芦苇看起来在发抖。",
+        "池塘在喘气。水底耗尽了氧气，鱼群浮在水面，嘴一张一合，像是在向空气讨一口呼吸。",
+    ],
+    "暴雨": [
+        "雨砸在水面上，没有一刻平静，浑浊的泥水从四面八方涌进来。",
+        "池塘涨得认不出来了。岸边的草淹在水下，雨水还在不停地灌，水面离岸越来越近。",
+        "暴雨不停。水色浑黄，泥沙悬在水中久久不沉，池塘像是变成了一锅搅不完的浊汤。",
+    ],
+    "洪水": [
+        "上游的水还在翻涌而下，浑浊的洪流裹着断枝碎叶，把池塘冲得面目全非。",
+        "水位猛涨，岸边的界线彻底消失了。洪水带着泥沙灌进来，水底的一切都被搅了起来。",
+        "洪水汹涌，池塘成了浑黄的一片。什么都站不稳，什么都被冲着走。",
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# 2g. 水质恶化专属短描写（observe 中追加，各 2 套）
+# ---------------------------------------------------------------------------
+
+WATER_DEGRADE = {
+    "green": [
+        "水色一天比一天绿，浓得像泡过久的茶。池底的石头和水草都蒙上了一层绿翳。",
+        "绿意从水底漫上来，不是水藻的翠绿，而是一种浑浊的、发腥的绿。",
+    ],
+    "turbid": [
+        "水浑得像搅过的泥浆，一眼看不透半寸。水里的动静全凭猜测。",
+        "泥沙久久不沉，悬在水中，把所有轮廓都泡软了。池塘变成了一池模糊的暗影。",
+    ],
+    "smell": [
+        "空气里浮着一股腥气，不是草腥，是腐烂的腥。水面上偶尔冒出一串黏稠的气泡。",
+        "池水闻起来有股闷闷的臭味，像是水底在慢慢腐败。连野鸭都游到了上风处。",
+    ],
+    "foam": [
+        "水面浮着一层细密的白泡，聚在岸边和水草周围，风吹不散。",
+        "气泡从水底一串串升上来，在水面堆成一小片浮沫，黏稠，微微发亮。",
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# 2h. 访客捕食目标不存在时的文案（各 2 套）
+# ---------------------------------------------------------------------------
+
+VISITOR_MISS = {
+    "翠鸟": [
+        "翠鸟扎进水里，又空空地窜回来。池塘里没有它要找的银亮影子。",
+        "它在那根枯枝上等了很久。水面下什么也没有。翠鸟终于飞走了，带着一身空落落的蓝。",
+    ],
+    "苍鹭": [
+        "苍鹭在浅水里站了很久，长喙始终没有刺下去。水里没有鱼经过。它慢慢收拢翅膀，飞远了。",
+        "浅水区空空荡荡。苍鹭换了几处位置，最终还是展开宽大的翅膀，朝别处飞去了。",
+    ],
+    "池鹭": [
+        "池鹭踩着浮萍走了几步，低头盯着水下。没有泥鳅。它又盯了一会儿，默默飞走了。",
+        "池鹭的长喙悬在水面之上，停住了。淤泥里什么动静也没有。它收回了脖子，轻轻飞起。",
+    ],
+    "白鹭": [
+        "白鹭在浅水里来来回回翻找，什么也没找到。它停了片刻，展开修长的白翅飞远了。",
+        "泥底静悄悄的。白鹭的长腿在水中站了很久，终于抬起，一步一步走出了池塘。",
+    ],
+    "流浪猫": [
+        "流浪猫蹲在岸边，爪子在水中捞了又捞。什么也没有。它甩甩爪子，悻悻地走了。",
+        "猫盯了很久的水面，尾巴轻轻甩着。水里没有鱼影闪过。它站起来，钻进草丛不见了。",
+    ],
+}
+
+# ---------------------------------------------------------------------------
+# 2i. 物种归零回忆描写（chronicle 在归零记录旁追加，每种 1 句）
+# ---------------------------------------------------------------------------
+
+EXTINCT_MEMORY = {
+    "水藻": "池塘曾经绿意盎然，水藻如林，如今石面上空空荡荡。",
+    "浮萍": "水面上那层细碎的绿毯散尽了，风再吹来，只有空荡的水光。",
+    "芦苇": "岸边那些在风里沙沙作响的苇秆，一棵也看不到了。",
+    "水蚤": "曾几何时，水蚤密密麻麻，光柱里全是跳动的影子。",
+    "田螺": "水底的石头上不再有那些缓慢移动的壳，黏液痕早已干涸。",
+    "孑孓": "水面下那些一扭一扭的小虫消失了，静水恢复了彻底的安静。",
+    "鲫鱼": "池塘曾经银光闪闪，鲫鱼群倏地转向时翻起一片碎光。如今深水空空荡荡。",
+    "蝌蚪": "浅水边那些黑豆般挤在一起的蝌蚪，再也不会出现了。",
+    "蜻蜓幼虫": "淤泥里的伏击者消失了，水底再也看不到那双警觉的眼。",
+    "青蛙": "暮色里再也没有蛙鸣试探般地响起，池塘的黄昏忽然变轻了。",
+    "田鼠": "芦苇丛间的兽径渐渐被风吹平，再也没有窸窣的响动从深处传来。",
+    "鲤鱼": "深水里曾经掠过巨大的暗影，鲤鱼翻身的浑雾再也不会升起。",
+    "蚊子": "水面上的嗡鸣消失了，黄昏变得干净，也变空了。",
+    "蜻蜓成虫": "水面上再也不见那道闪光的掠影，芦苇枝头空落落的。",
+    "泥鳅": "淤泥里不再有钻来钻去的影子，水底的浑雾从此平息了。",
+    "淡水虾": "石缝里空了。那些透明的小东西弹走之后，再也没有弹回来。",
+    "河蚌": "水底的壳合上了。再也没有蚌壳翕动，过滤出那一线清水。",
+    "水黾": "水面上的细密水印消失了，风平浪静，却少了一层轻功。",
+    "睡莲": "圆叶枯了，白花谢了。水面重新变得空旷，再也没有青蛙蹲在上面的沉一沉。",
+    "水蚯蚓": "淤泥表面那层细密的红蠕消失了，水底不再微微颤动。",
+    "蟾蜍": "干裂的泥地里再没有那个满身干土的身影，夜里那声闷闷的呱叫也听不到了。",
+}
+
 # ---------------------------------------------------------------------------
 # 3. 环境与季节
 # ---------------------------------------------------------------------------
@@ -741,7 +932,8 @@ SEASON_ENV = {
     "春": {"water_temp": 18, "light": 0.85, "desc": "光斜斜照进来，水开始暖了。"},
     "夏": {"water_temp": 28, "light": 1.0,  "desc": "日光白得晃眼，水面蒸起一层薄薄的热气。"},
     "秋": {"water_temp": 16, "light": 0.7,  "desc": "一片黄叶落在水面上，光变软了。"},
-    "冬": {"water_temp": 6,  "light": 0.45, "desc": "寒气从水面蔓延到池底，冰凌在岸边聚拢。"},
+    # 冬季基准压到 3℃（低于 4℃ 结冰阈值），使"结冰"成为冬季常态（item 五）
+    "冬": {"water_temp": 3,  "light": 0.45, "desc": "寒气从水面蔓延到池底，冰凌在岸边聚拢。"},
 }
 
 
@@ -772,6 +964,8 @@ ACHIEVEMENTS = {
     "底栖王国": "泥鳅、水蚯蚓、河蚌同时存在",
     "水华危机": "经历了一次水华",
     "共生之池": "同时存在 15 种以上物种",
+    "睡莲花开": "盛夏里睡莲第一次开花",
+    "疫病爆发": "经历了一次疫病",
 }
 
 
@@ -815,6 +1009,11 @@ def fresh_state(seed):
             "garden_streak": 0,          # 睡莲与水藻同时存在的连续天数
             "experienced_drought": False,  # 是否经历过干旱
             "duck_visits": 0,            # 迁徙野鸭群累计来访次数
+            # 四季生态机制状态
+            "ice_on": False,             # 冬季是否结冰（持续到春季）
+            "had_lily": False,           # 是否曾有过睡莲（来年春季可恢复）
+            "lily_bloom_year": -1,       # 上次睡莲开花的年份（每年一次）
+            "do_alerted": False,         # 溶氧危机是否已提示（去重）
         },
         "log": [],                   # 最近一回合的事件列表
         "pending_pause": None,       # wait 自动暂停原因
@@ -836,6 +1035,12 @@ def fresh_state(seed):
         # V1.0 扩展：连锁叙事计时器 与 解锁冷却
         "chain": {},                 # 连锁效果 -> 生效截止回合
         "last_unlock_turn": -999,    # 上次解锁回合（解锁冷却用）
+        # 内测修复：持续性天气过程 与 已提示成就
+        "active_weather": None,       # 进行中的持续灾害 dict 或 None
+        "achievements_alerted": [],   # 已弹过提示的成就（import 后不重复弹）
+        "hibernate": {},              # 冬眠暂存：物种 -> 冬眠前数量（春季恢复）
+        "diseases": {},               # 进行中疫病：物种 -> {"elapsed","duration"}
+        "disease_immune": {},         # 疫病免疫：物种 -> 免疫截止回合
     }
 
 
@@ -899,6 +1104,11 @@ def _migrate(state):
     state.setdefault("extinct_alerted", [])
     state.setdefault("chain", {})
     state.setdefault("last_unlock_turn", -999)
+    state.setdefault("active_weather", None)
+    state.setdefault("achievements_alerted", list(state.get("achievements", [])))
+    state.setdefault("hibernate", {})
+    state.setdefault("diseases", {})
+    state.setdefault("disease_immune", {})
 
 
 def rng_from(state):
@@ -936,6 +1146,433 @@ def _chain_active(state, key):
     return state["turn"] <= state.get("chain", {}).get(key, -1)
 
 
+# ---------------------------------------------------------------------------
+# 7a. 持续性天气过程（干旱 / 热浪 / 暴雨 / 洪水）—— 逐日演化 + 自然恢复
+# ---------------------------------------------------------------------------
+
+WEATHER_SPEC = {
+    "干旱": {"min": 5, "max": 7},
+    "热浪": {"min": 3, "max": 5},
+    "暴雨": {"min": 1, "max": 2},
+    "洪水": {"min": 2, "max": 3},
+}
+
+_WEATHER_END = {
+    "干旱": "雨终于落了下来。水线一点点往上爬，干裂的泥岸重新没入水中，池塘缓了过来。",
+    "热浪": "热浪过去了。夜里起了风，水面第一次有了凉意，水温一点点退下来。",
+    "暴雨": "雨停了。浑浊的水面慢慢沉淀，泥沙落回水底，只是营养盐留在了水里。",
+    "洪水": "洪水退去了。水位落回原处，岸边的界线重新显现，只是池塘已经不是原来的样子。",
+}
+
+
+def _start_weather(state, kind, mitigated):
+    """开启一段持续性灾害。时长按回合数确定性派生（不消耗 PRNG）。"""
+    spec = WEATHER_SPEC[kind]
+    span = spec["max"] - spec["min"] + 1
+    duration = spec["min"] + (state["turn"] % span)
+    state["active_weather"] = {"kind": kind, "elapsed": 0,
+                               "duration": duration, "mitigated": bool(mitigated)}
+    # 保持原有玩法修正（青蛙/蟾蜍的旱季修正、水华的热浪窗口）与灾害时长对齐
+    if kind == "干旱":
+        _chain_set(state, "drought", duration)
+    elif kind == "热浪":
+        _chain_set(state, "heatwave", duration)
+
+
+def _weather_turnover(state, events):
+    """热浪末日溶氧 < 2 的翻塘：有需氧生物可死时才成立（否则不算大规模死亡）。"""
+    pop = state["populations"]
+    env = state["env"]
+    killed = 0.0
+    for name in SPECIES:
+        if SPECIES[name].get("needs_oxygen"):
+            lost = pop[name] * 0.4
+            pop[name] -= lost
+            env["detritus"] += lost * 0.5
+            killed += lost
+    if killed >= 1:
+        events.append("crisis:热浪烤干了水里最后的呼吸，鱼接连翻起白肚，浮在发烫的水面上。")
+        _unlock(state, events, "翻塘")
+
+
+def _process_weather(state, events):
+    """逐日推进进行中的灾害；前期只描写，后期才施压，结束后转入自然恢复。"""
+    aw = state.get("active_weather")
+    if not aw:
+        return
+    env = state["env"]
+    kind = aw["kind"]
+    sev = 0.5 if aw["mitigated"] else 1.0
+    aw["elapsed"] += 1
+    day = aw["elapsed"]
+    if kind == "干旱":
+        # 水位缓慢下降：以浓缩升温 + 溶氧逐步降低表现。前两天只是变化，后几天才施压。
+        env["water_temp"] = _clamp(env["water_temp"] + 0.4 * sev, 0.0, 40.0)
+        drop = (0.15 if day <= 2 else 0.5) * sev
+        env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - drop)
+        env["nutrients"] += 1.0 * sev
+    elif kind == "热浪":
+        # 水温逐日升高、溶氧逐日降低
+        env["water_temp"] = _clamp(env["water_temp"] + (1.0 + 0.3 * day) * sev, 0.0, 42.0)
+        env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - (0.5 + 0.2 * day) * sev)
+    elif kind == "暴雨":
+        env["turbidity"] = _clamp(env["turbidity"] + 0.2 * sev, 0.0, 1.0)
+        env["nutrients"] += 22 * sev
+    elif kind == "洪水":
+        env["turbidity"] = _clamp(env["turbidity"] + 0.3 * sev, 0.0, 1.0)
+        env["nutrients"] += 30 * sev
+        env["detritus"] += 25 * sev
+    # 进行中的专属描写（weather 标签：不强制暂停 wait）
+    events.append("weather:" + _pick_t(state, WEATHER_ONGOING[kind]))
+    ended = day >= aw["duration"]
+    # 热浪最后一天：溶氧 < 2 可能翻塘
+    if kind == "热浪" and ended and env["dissolved_oxygen"] < 2.0:
+        _weather_turnover(state, events)
+    if ended:
+        events.append("weather:" + _WEATHER_END.get(kind, "天气慢慢平复了下来。"))
+        state["active_weather"] = None
+
+
+# ---------------------------------------------------------------------------
+# 7b. 四季生态机制（季节繁殖系数 / 季节事件 / 结冰 / 渐变过渡）
+# ---------------------------------------------------------------------------
+
+SEASON_BIRTH = {"春": 1.3, "夏": 1.5, "秋": 0.8, "冬": 0.3}  # 季节繁殖系数
+FISH = ("鲫鱼", "鲤鱼", "泥鳅")
+# 季节过渡：(年内日 y 起点, 起温, 终温)，季末 3 天线性过渡，避免阶跃
+_TEMP_RAMPS = [(28, 18, 28), (58, 28, 16), (88, 16, 3), (118, 3, 18)]
+
+
+def _year_day(turn):
+    return (turn - 1) % YEAR_LEN + 1  # 1..120
+
+
+def _ramped_target_temp(turn):
+    """水温目标：季末 3 天向下一季线性过渡（item 六）。"""
+    y = _year_day(turn)
+    for start, a, b in _TEMP_RAMPS:
+        if start <= y <= start + 2:
+            return a + (b - a) * ((y - start + 1) / 3.0)
+    return SEASON_ENV[season_of(turn)]["water_temp"]
+
+
+def _season_birth_factor(state, name, season):
+    """季节繁殖系数（含物种特例）。返回乘数；0 表示本季不繁殖。"""
+    env = state["env"]
+    f = SEASON_BIRTH[season]
+    if name in FISH and season == "冬":
+        return 0.0                      # 鱼类冬季完全停止繁殖
+    if season == "春":
+        if name in FISH:
+            f *= 1.2                    # 鱼类进入繁殖期
+        if name == "田鼠":
+            f *= 1.5                    # 田鼠活跃
+    elif season == "夏":
+        if name == "孑孓":
+            f *= 2.0                    # 孑孓/蚊子活跃
+        if name == "浮萍":
+            f *= 1.3                    # 浮萍生长加速
+        if name == "水蚯蚓" and env["detritus"] > 40:
+            f *= 2.0                    # 高碎屑时水蚯蚓爆发
+    elif season == "秋":
+        if name == "芦苇":
+            return 0.0                  # 芦苇枯黄，停止生长
+    elif season == "冬":
+        if name == "田鼠":
+            return 0.0                  # 田鼠缩在洞里不繁殖（有存粮）
+        if name == "蟾蜍":
+            return 0.0                  # 蟾蜍不冬眠但冬季繁殖率为 0
+    return f
+
+
+def _season_death_factor(name, season, turn):
+    """季节死亡系数（浮萍/蝌蚪冬季高死亡，睡莲秋末加速枯萎）。"""
+    f = 1.0
+    if season == "冬":
+        if name == "浮萍":
+            f *= 3.0
+        if name == "蝌蚪":
+            f *= 3.0                    # 蝌蚪几乎活不过冬天
+    elif season == "秋" and name == "睡莲" and _year_day(turn) >= 76:
+        f *= 2.0                        # 秋季后半段睡莲枯萎开始
+    return f
+
+
+# 季节性叙事事件文案（占位，后续可替换）
+SEASON_TEXT = {
+    "冰融": "冰层从岸边开始裂开，池塘重新呼吸了。",
+    "蛙醒": "岸边的泥里传来窸窣，冬眠的青蛙揉了揉眼，重新跳回了水边。",
+    "睡莲抽芽": "水底冒出几片卷着的嫩叶，慢慢撑开，铺在水面上。",
+    "睡莲重生": "去年的睡莲从根茎里又长了出来，几片新叶浮上水面。",
+    "睡莲开花": "盛夏的午后，睡莲开出了今年第一朵白花，花瓣层层张开，迎着光。",
+    "芦苇枯黄": "芦苇穗子变黄了，在风里沙沙作响。",
+    "结冰": "水面凝起一层薄冰，从岸边一直冻向池心，池塘的呼吸慢了下来。",
+    "昆虫冻死": "一夜寒霜，水面上的蚊蚋和蜻蜓都不见了踪影，冻进了这个冬天。",
+}
+
+
+def _season_events(state, events, season, prev_season):
+    """季节切换时的自动事件（春融冰/抽芽、夏开花、秋枯黄、冬结冰等，item 二~五）。"""
+    pop = state["populations"]
+    env = state["env"]
+    f = state["flags"]
+    if season == prev_season:
+        return
+    if season == "春":
+        if f.get("ice_on"):
+            f["ice_on"] = False
+            events.append("weather:" + SEASON_TEXT["冰融"])
+        # 青蛙苏醒：恢复冬眠前暂存的数量（item 五）
+        hib = state.setdefault("hibernate", {})
+        if hib.get("青蛙", 0) > 0:
+            pop["青蛙"] = pop.get("青蛙", 0.0) + hib.pop("青蛙")
+            events.append("season:" + SEASON_TEXT["蛙醒"])
+        # 睡莲抽芽 / 去年有过睡莲则自动恢复少量
+        if pop.get("睡莲", 0) >= 1:
+            events.append("season:" + SEASON_TEXT["睡莲抽芽"])
+        elif f.get("had_lily"):
+            pop["睡莲"] = 5.0
+            events.append("season:" + SEASON_TEXT["睡莲重生"])
+    elif season == "秋":
+        if pop.get("芦苇", 0) >= 1:
+            events.append("season:" + SEASON_TEXT["芦苇枯黄"])
+    elif season == "冬":
+        # 昆虫冻死归零
+        if pop.get("蚊子", 0) >= 1 or pop.get("蜻蜓成虫", 0) >= 1:
+            events.append("season:" + SEASON_TEXT["昆虫冻死"])
+        pop["蚊子"] = 0.0
+        pop["蜻蜓成虫"] = 0.0
+
+
+# ---------------------------------------------------------------------------
+# 7c. 疾病系统（密度过高触发疫病，逐期加重，可沿食物链传染）
+# ---------------------------------------------------------------------------
+
+# 疫病前兆期（第1-2天）的 observe 专属描写：按物种各 4 套
+DISEASE_ONSET = {
+    "鲫鱼": [
+        "几条鲫鱼游得歪歪扭扭，像是忘了该怎么摆尾。它们离开鱼群，独自漂在浅水处。",
+        "一条鲫鱼侧着身子游了一段，又正过来，又侧过去。鳞片上没有光。",
+        "水草丛里，一条鲫鱼悬在那里，鳃盖翕动得比平时慢。鱼群从它身边游过，它没有跟上去。",
+        "有两条鲫鱼擦着水底的石头游过，蹭掉了鳞片。银亮的碎片沉在泥上，暗了下去。",
+    ],
+    "鲤鱼": [
+        "那条鲤鱼游得比平时慢。它不再拱翻底泥，只是慢慢划过水底，尾巴拖在后面。",
+        "鲤鱼浮上来换气，嘴张了很久才合上。然后它沉下去，沉得比平时更深。",
+        "深水里，鲤鱼的暗影不再巡游。它停在最暗的角落，一动不动。",
+        "鲤鱼的鳞片上蒙了一层灰白的东西。它甩了甩尾，但那层灰白没有掉。",
+    ],
+    "泥鳅": [
+        "几条泥鳅从淤泥里钻出来，瘫在泥面上，不再钻回去。胡须软软地垂着。",
+        "泥鳅把自己搁在腐叶上，身体弯成一个奇怪的弧度。泥面上没有它们钻出的新孔了。",
+        "一条泥鳅扭了一下，又扭了一下，然后就不动了。它浮在泥面上，像一截断了的绳子。",
+        "淤泥表面多了几条瘫着的泥鳅。它们平时只在夜里出来，现在却在光下暴露着。",
+    ],
+    "水蚤": [
+        "水蚤的颜色发暗了。它们不再是透明的，而是带着一层浑浊的灰。",
+        "光柱里的水蚤跳动得比平时慢。它们一顿一顿地浮沉，像是在水里挣扎。",
+        "几只水蚤沉在水底，细细的附肢还在动，但已经弹不起来了。",
+        "成群的水蚤不再聚在光里。它们散开了，零零落落地漂着。",
+    ],
+    "田螺": [
+        "田螺的壳口冒出一团黏糊糊的东西，不是平时那种清亮的黏液痕。",
+        "几只田螺停在了石头上，底下没有爬过的痕迹。它们已经很久没有移动了。",
+        "田螺的壳口微微张开，里面的软体在轻轻抽搐，没有缩回去。",
+        "石头上倒着一只田螺，壳朝天。它没有再翻过来。",
+    ],
+    "孑孓": [
+        "孑孓的扭动变得无力。它们悬在水面下，尾巴摆动的幅度越来越小。",
+        "成片的孑孓不再同时沉浮。有的浮着不动，有的沉下去了就没再升上来。",
+        "一条孑孓在水里打着转，扭动的节奏乱了。周围的孑孓也没有避开它。",
+        "水面下那些倒挂的小身子歪歪斜斜的，有几个已经变成了灰白色。",
+    ],
+    "水蚯蚓": [
+        "曾经成团蠕动的水蚯蚓散开了。红色的细丝各自漂在泥面上，不再缠在一起。",
+        "一条水蚯蚓脱离了泥面，在水里慢慢漂着。它不再扭动，只是随波逐流。",
+        "泥面上那层红色的蠕动变薄了。更多的红丝散落在各处，一动不动。",
+        "水蚯蚓从泥里往外爬，爬出来就停住了，摊在水底，颜色一天比一天暗。",
+    ],
+    "淡水虾": [
+        "淡水虾缩在石缝里，触须也不探出来了。石缝外面安安静静。",
+        "一只淡水虾从石缝里跌了出来，弹了一下，没有弹回去。它侧躺在泥面上。",
+        "几只虾聚在石缝口，半截身子露在外面，却没有退回去的意思。",
+        "淡水虾的透明身子上出现了白色的斑点。它在原地转了几圈，又缩回了暗处。",
+    ],
+    "青蛙": [
+        "青蛙的叫声变哑了。平时清亮的蛙鸣变得沙哑，像是喉咙里塞了什么东西。",
+        "一只青蛙蹲在浮萍上，鼓着腮，但始终没有叫出来。它张了张嘴，又合上了。",
+        "青蛙跳进水里的动作变慢了。它蹬了一下腿，没蹬动，又蹬了一下，才滑进水里。",
+        "岸边的青蛙不再追逐飞虫。它们趴着，眼睛半闭，对从嘴边飞过的蚊子毫无反应。",
+    ],
+    "蟾蜍": [
+        "蟾蜍趴着不动，比平时更久。它的眼睛一直睁着，但眼睑很久才眨一次。",
+        "一只蟾蜍拖着后腿爬了一段，又停下来。身后的拖痕歪歪斜斜。",
+        "蟾蜍的皮肤比平时更干了，裂出细小的纹。它蹲在泥地里，像一块真正的泥。",
+        "夜色里，蟾蜍闷闷地叫了一声，只叫了一声。然后沉默了很久。",
+    ],
+    "水黾": [
+        "水黾在水面上打转，不再像平时那样沿着直线滑行。它的长腿在划着杂乱的圈。",
+        "一只水黾停在水面上，长腿压出浅浅的凹坑，却没有移动。风吹过来，它只是轻轻晃了一下。",
+        "水黾的滑行慢了。每一步都在水面压出更深的坑，像是水在用力拉着它。",
+        "几只水黾撞在一起，没有像往常那样迅速弹开。它们各自歪着，慢慢漂远了。",
+    ],
+    "河蚌": [
+        "河蚌的壳缝不再张开。它紧紧地闭着，泥面上没有新吐出的小颗粒。",
+        "一只河蚌从泥里浮出来半截，壳口朝上，像在等着什么。什么也没有流进去。",
+        "河蚌的壳沿上积了一层灰暗的东西，不是泥，而是某种黏稠的膜。",
+        "几只河蚌同时闭紧了。水从它们旁边流过，却没有一道被滤清的痕迹。",
+    ],
+    "蜻蜓幼虫": [
+        "蜻蜓幼虫伏在淤泥里，猎物从它面前游过，它没有出击。它的眼珠转了一下，又定住了。",
+        "一只蜻蜓幼虫从潜伏的位置跌出来，侧躺在泥上。它的腿慢慢划动，没有翻身。",
+        "蜻蜓幼虫的颜色变暗了，从灰褐变成了一种不健康的暗黑。它缩在水草根部，一动不动。",
+        "捕肢弹了一下，是空的。蜻蜓幼虫没有再收回捕肢，它就这样伸展着，像一件脱了线的武器。",
+    ],
+}
+# 未单列物种的前兆通用文案（%s = 物种名）
+DISEASE_ONSET_GENERIC = [
+    "%s 里出现了萎靡的个体，动作迟缓，体表蒙上一层灰翳。",
+    "%s 的群体中，有些开始反应失常，像是染上了什么。",
+    "%s 间隐隐有了病气，零星几只脱离了群体，歪斜着漂在一旁。",
+]
+# 扩散期（第3-5天）通用 5 套
+DISEASE_SPREAD = [
+    "水底多了几具小小的尸体。鲫鱼的白腹在暗色水面上格外显眼，一条、两条、三条。",
+    "病不只是停留在一个物种身上了。隔壁的水层里，另一些影子也开始歪斜。",
+    "池塘安静了许多。那些平时在光柱里跳动的水蚤，现在稀稀落落，光柱空了大半。",
+    "死亡从水底蔓延到水面。孑孓不再扭动，田螺从石头上脱落，水黾的长腿折叠着漂在水上。",
+    "青蛙不叫了。鱼群不再穿梭。只有腐气从水底升上来，在水面碎成细密的气泡。",
+]
+# 高峰期（第6天起）通用 5 套
+DISEASE_PEAK = [
+    "水面漂着尸体。鲫鱼侧翻着，鳞片失去光泽，随波轻轻晃动。没有谁来清理它们。",
+    "曾经热闹的水层空了。光柱里没有跳动的影子，水草间没有穿梭的银光。池塘在沉默。",
+    "只有最强壮的还在挣扎。一条鲤鱼缓慢地巡游，从尸体中间穿过，尾鳍搅起的浑雾里带着腐味。",
+    "水底铺着一层白色的螺壳，有些空了，有些半张着。螃蟹缩在石缝里，再没有挥过钳子。",
+    "疫病像是把池塘的呼吸掐住了。水面不起波澜，水底不生涟漪，一切都压在沉闷里。",
+]
+# 传染发生时的 observe 描写 5 套
+DISEASE_TRANSMIT = [
+    "病没有停在一个物种上。它顺着水流，顺着食物链，顺着每一次捕食和每一次接触，悄悄爬了过去。",
+    "隔壁的种群开始歪斜。前几天还在活动的那些影子，现在也慢了下来，动作变了形。",
+    "一种生命倒下后，吃它的那些也跟着倒了。病沿着食物链往上爬，每一步都踩着尸体。",
+    "水面这边还没什么事，水底那边已经不行了。但水面这边也开始有征兆了。",
+    "疫病像一道看不见的波纹，从第一个倒下的个体往外扩散，一圈一圈，越扩越远。",
+]
+# 疫病结束时的 observe 描写 5 套
+DISEASE_END = [
+    "活下来的个体重新开始活动。一条鲫鱼慢慢游过浅水，鳞片上重新有了光。",
+    "水质一天比一天清。尸体沉入淤泥，被分解者慢慢消化。池塘在自愈。",
+    "安静了很久之后，第一声响动出现了。是一只青蛙，试探般地叫了一声。然后又是一声。",
+    "水蚤重新出现在光柱里，先是几只，然后是一小群。它们弹跳着，光柱又活了。",
+    "池塘长长地吐了一口气。水面荡开一圈圈涟漪，不是死水了，是在重新呼吸。",
+]
+# chronicle 记录：开始 / 传染 / 结束 各 5 句
+DISEASE_CHRON_START = [
+    "池塘里有什么在悄悄蔓延。先是几条鲫鱼游歪了，然后是更多的影子跟着歪斜。",
+    "一种看不见的东西潜入了池塘。它在水里扩散，谁也不知道边界在哪里。",
+    "池塘开始生病了。第一具尸体浮上水面的时候，谁也没想到这只是一个开始。",
+    "水底的泥鳅不再钻泥，水面下的孑孓不再扭动。池塘的节奏乱了。",
+    "安静是从水底开始的。然后一层一层往上蔓延，直到整个池塘都沉默了。",
+]
+DISEASE_CHRON_SPREAD = [
+    "疫病不满足于一种宿主。它找到了新的载体，池塘里另一种生命也开始倒下。",
+    "隔壁的种群没有幸免。歪斜的影子从一个物种蔓延到另一个，像一道无声的涟漪。",
+    "病在水里转了一圈，又找到了新的落脚处。第二道防线也失守了。",
+    "池塘里的死亡不再只属于一个物种。尸体从不同的水层浮上来，白腹、暗壳、透明的翅膀。",
+    "疫病沿着食物链爬了上去。吃病体的那些，自己也病倒了。",
+]
+DISEASE_CHRON_END = [
+    "活下来的重新站了起来。池塘沉默了一会儿，又开始动了。",
+    "最后一批尸体沉入淤泥。水面重新映出天光，不再有白腹漂在上面。",
+    "池塘瘦了一圈。但活下来的还在游，还在爬，还在叫。生命没有全部熄灭。",
+    "疫病退去了。活下来的个体开始繁殖，池塘慢慢填满那些空了的角落。",
+    "水重新变清，气泡重新从水底升起。池塘像是发了一场大烧，现在烧退了。",
+]
+
+
+def _disease_adjacent(state, name):
+    """食物链相邻物种：捕食者（食谱含 name）+ 同层竞争者（共享食物来源）。"""
+    sp = SPECIES[name]
+    my_food = set(f for f in sp["food_sources"] if f != "飞虫")
+    adj = set()
+    for other, osp in SPECIES.items():
+        if other == name:
+            continue
+        if name in osp["food_sources"]:
+            adj.add(other)                      # 捕食者
+        elif my_food & set(f for f in osp["food_sources"] if f != "飞虫"):
+            adj.add(other)                      # 同层竞争者
+    return [a for a in adj if a in RESIDENT_SPECIES]
+
+
+def _start_disease(state, events, name, r):
+    state["diseases"][name] = {"elapsed": 0, "duration": r.randint(7, 10)}
+    _chronicle(state, _pick(r, DISEASE_CHRON_START))
+    _unlock(state, events, "疫病爆发")
+
+
+def _process_disease(state, events, r):
+    """逐日推进疫病：前兆(1-2)只描写、扩散(3-5)death×2且30%传染、高峰(6+)death×3。"""
+    pop = state["populations"]
+    env = state["env"]
+    diseases = state.setdefault("diseases", {})
+    immune = state.setdefault("disease_immune", {})
+    turn = state["turn"]
+    ended = []
+    newly = []
+    for name in list(diseases.keys()):
+        d = diseases[name]
+        d["elapsed"] += 1
+        day = d["elapsed"]
+        sp = SPECIES[name]
+        if day <= 2:
+            phase, mult = "onset", 1.0
+            if name in DISEASE_ONSET:
+                txt = _pick(r, DISEASE_ONSET[name])
+            else:
+                txt = _pick(r, DISEASE_ONSET_GENERIC) % name
+        elif day <= 5:
+            phase, mult = "spread", 2.0
+            txt = _pick(r, DISEASE_SPREAD)
+        else:
+            phase, mult = "peak", 3.0
+            txt = _pick(r, DISEASE_PEAK)
+        # 额外死亡（叠加在已结算的基础死亡之上）
+        if mult > 1.0 and pop.get(name, 0) > 0:
+            extra = pop[name] * sp["death_rate"] * (mult - 1.0)
+            new_n = max(0.0, pop[name] - extra)
+            env["detritus"] += (pop[name] - new_n) * 0.5
+            pop[name] = new_n
+        events.append("disease:" + txt)
+        # 扩散期：30% 概率传染到食物链相邻的一个物种（clean 后传播概率减半）
+        spread_p = 0.15 if _chain_active(state, "sanitized") else 0.3
+        if phase == "spread" and r.chance(spread_p):
+            cands = [a for a in _disease_adjacent(state, name)
+                     if pop.get(a, 0) >= 1 and a not in diseases and turn > immune.get(a, -1)]
+            if cands:
+                target = cands[r.randint(0, len(cands) - 1)]
+                newly.append(target)
+                _chronicle(state, _pick(r, DISEASE_CHRON_SPREAD))
+                events.append("disease:" + _pick(r, DISEASE_TRANSMIT))
+        if day >= d["duration"]:
+            ended.append(name)
+    for name in ended:
+        diseases.pop(name, None)
+        immune[name] = turn + 30          # 结束后 30 天免疫
+        _chronicle(state, _pick(r, DISEASE_CHRON_END))
+        events.append("disease:" + _pick(r, DISEASE_END))
+    for t in newly:
+        diseases.setdefault(t, {"elapsed": 0, "duration": r.randint(7, 10)})
+    # 触发新疫病：密度 > 80% 承载且非免疫，每天 3% 概率；一回合最多新发一种
+    for name in RESIDENT_SPECIES:
+        if name in diseases or turn <= immune.get(name, -1):
+            continue
+        if pop.get(name, 0) > 0.8 * SPECIES[name]["max_capacity"] and r.chance(0.03):
+            _start_disease(state, events, name, r)
+            break
+
+
 def tick(state):
     """推进一回合，返回本回合事件文字列表。"""
     r = rng_from(state)
@@ -951,25 +1588,57 @@ def tick(state):
     if season != prev_season:
         events.append("season:" + SEASON_ENV[season]["desc"])
         _chronicle(state, "入%s，%s" % (season, SEASON_ENV[season]["desc"]))
+    # 季节切换的自动事件（融冰/抽芽/枯黄/昆虫冻死等）
+    _season_events(state, events, season, prev_season)
 
     # --- (1) 环境参数变化 ---
     target = SEASON_ENV[season]
-    env["water_temp"] += (target["water_temp"] - env["water_temp"]) * 0.2
+    # 水温向"季末 3 天渐变过渡"后的目标缓动，避免阶跃（item 六）
+    env["water_temp"] += (_ramped_target_temp(turn) - env["water_temp"]) * 0.34
+    # 冬季结冰：水温 < 4℃ 自动进入结冰状态，持续到春季（item 五）
+    if season == "冬" and env["water_temp"] < 4.0:
+        if not state["flags"].get("ice_on"):
+            state["flags"]["ice_on"] = True
+            events.append("weather:" + SEASON_TEXT["结冰"])
+    ice = state["flags"].get("ice_on", False)
     # 水面覆盖率（浮萍 + 睡莲）影响光照
     duckweed_cover = _surface_cover(state)
-    # 大雾：光照系数压低（连锁效果，持续约 2 天）
-    light_target = target["light"] * (0.3 if _chain_active(state, "fog") else 1.0)
+    # 大雾：光照系数压低（连锁效果，持续约 2 天）；结冰再额外压低光照 ×0.3
+    light_target = target["light"] * (0.3 if _chain_active(state, "fog") else 1.0) \
+        * (0.3 if ice else 1.0)
     base_light = light_target * (1 - 0.6 * duckweed_cover) * (1 - 0.5 * env["turbidity"])
     env["light"] += (base_light - env["light"]) * 0.3
     env["light"] = _clamp(env["light"], 0.0, 1.0)
     # 浑浊度自然沉降
     env["turbidity"] = _clamp(env["turbidity"] * 0.9, 0.0, 1.0)
+    # 秋季落叶：每天自动增加有机碎屑（item 四）
+    if season == "秋":
+        env["detritus"] += 0.5
     # 溶氧：温度越高溶氧越低；光合作用（水藻）产氧；覆盖>80%阻断气体交换
     do_sat = _clamp(14.6 - 0.35 * env["water_temp"], 4.0, 14.6)
     photo = 0.002 * pop["水藻"] * env["light"]
     exchange = 1.0 if duckweed_cover < 0.8 else 0.2
     env["dissolved_oxygen"] += ((do_sat - env["dissolved_oxygen"]) * 0.3 * exchange) + photo * 0.01
+    # 结冰阻断气体交换：溶氧每天额外 -0.5（与浮萍覆盖叠加，item 五）
+    if ice:
+        env["dissolved_oxygen"] -= 0.5
     env["dissolved_oxygen"] = _clamp(env["dissolved_oxygen"], 0.0, 16.0)
+
+    # 冬季睡莲枯萎到 0（来年春天从根茎恢复，见 _season_events）
+    if season == "冬":
+        if pop.get("睡莲", 0) >= 1:
+            state["flags"]["had_lily"] = True
+            pop["睡莲"] = 0.0
+        pop["蚊子"] = 0.0
+        pop["蜻蜓成虫"] = 0.0
+        # 青蛙冬眠：完全移出种群计算（不捕食/不被捕食/不死亡/不繁殖），暂存待春季恢复
+        if pop.get("青蛙", 0) > 0:
+            hib = state.setdefault("hibernate", {})
+            hib["青蛙"] = hib.get("青蛙", 0.0) + pop["青蛙"]
+            pop["青蛙"] = 0.0
+
+    # --- (1b) 持续性灾害逐日演化（在自然恢复趋势之上叠加灾害施压） ---
+    _process_weather(state, events)
 
     # --- (2) 生产者 Logistic 增长 ---
     temp_factor = _clamp(1 - abs(env["water_temp"] - 24) / 30, 0.2, 1.0)
@@ -991,8 +1660,10 @@ def tick(state):
         else:  # 芦苇 受季节影响小
             k = sp["max_capacity"] * temp_factor
         k = max(1.0, k)
-        growth = sp["birth_rate"] * temp_factor * n * (1 - n / k)
-        pop[name] = max(0.0, n + growth - sp["death_rate"] * n)
+        sbf = _season_birth_factor(state, name, season)
+        growth = sp["birth_rate"] * sbf * temp_factor * n * (1 - n / k)
+        death = sp["death_rate"] * _season_death_factor(name, season, turn) * n
+        pop[name] = max(0.0, n + growth - death)
         if name == "水藻":
             env["nutrients"] = max(0.0, env["nutrients"] - growth * 0.05)
 
@@ -1029,6 +1700,21 @@ def tick(state):
         pop[name] = max(0.0, pop[name] + d)
 
     # --- (4) 消费者自然增长 + 自然死亡 ---
+    # 同层竞争：先统计每种食物的总需求（各消费者当前种群之和），
+    # 之后每个物种只能按自己种群占比拿到那份食物，而非独享全部。
+    food_demand = {}
+    for cname in SPECIES:
+        csp = SPECIES[cname]
+        if csp["trophic"] == "producer":
+            continue
+        cn = pop.get(cname, 0)
+        if cn <= 0:
+            continue
+        for fsrc in csp["food_sources"]:
+            if fsrc == "飞虫":
+                continue
+            food_demand[fsrc] = food_demand.get(fsrc, 0.0) + cn
+
     for name in SPECIES:
         sp = SPECIES[name]
         if sp["trophic"] == "producer":
@@ -1036,11 +1722,19 @@ def tick(state):
         n = pop[name]
         if n <= 0:
             continue
-        br = sp["birth_rate"] * temp_factor
+        # 季节繁殖系数（鱼类冬季为 0、春季加成、夏季孑孓/水蚯蚓加成等，item 一~五）
+        br = sp["birth_rate"] * _season_birth_factor(state, name, season) * temp_factor
         # 有食物来源者，繁殖受食物丰度影响：保底 20% 基础繁殖率，食物越多越接近满速
         if sp["food_sources"]:
             # "飞虫" 是隐形保底食物：只要有水草或有机碎屑，飞虫就存在，不计入真实种群
-            real_food = sum(pop.get(f, 0) for f in sp["food_sources"] if f != "飞虫")
+            # 同层竞争：共享食物按种群比例分配，本物种只拿到自己那份
+            real_food = 0.0
+            for f in sp["food_sources"]:
+                if f == "飞虫":
+                    continue
+                dem = food_demand.get(f, 0.0)
+                share = (n / dem) if dem > 0 else 0.0
+                real_food += pop.get(f, 0) * share
             factor = 0.2 + 0.8 * _clamp(real_food / (sp["max_capacity"] * 0.5), 0.0, 1.0)
             if "飞虫" in sp["food_sources"]:
                 flybugs = pop.get("水藻", 0) > 0 or pop.get("浮萍", 0) > 0 or env["detritus"] > 0
@@ -1072,7 +1766,7 @@ def tick(state):
             br *= 1.2
         k = sp["max_capacity"]
         births = br * n * (1 - n / max(1.0, k))
-        deaths = sp["death_rate"] * n
+        deaths = sp["death_rate"] * _season_death_factor(name, season, turn) * n
         # 低溶氧致死
         if sp.get("needs_oxygen") and env["dissolved_oxygen"] < 4.0:
             deaths += n * (4.0 - env["dissolved_oxygen"]) / 4.0 * 0.5
@@ -1096,6 +1790,9 @@ def tick(state):
 
     # --- (4b) 物种特殊效果（河蚌滤食 / 水蚯蚓分解 / 鲤鱼翻泥等） ---
     _apply_special_effects(state, events, r)
+
+    # --- (4c) 疾病系统（密度过高触发，逐期加重，可沿食物链传染） ---
+    _process_disease(state, events, r)
 
     # --- (5) 生命周期变态 ---
     _process_lifecycle(state, events, r)
@@ -1153,13 +1850,17 @@ def tick(state):
     # --- 成就检测 ---
     _check_achievements(state, events)
 
+    # --- 年终生态简报：每满一年（120 天）输出一段（item 28） ---
+    if turn % YEAR_LEN == 0:
+        _year_report(state, events)
+
     # --- 图鉴：记录出现过的物种 ---
     for name in RESIDENT_SPECIES:
         if pop[name] >= 1 and name not in state["seen"]:
             state["seen"].append(name)
 
-    # --- 连续无归零计数 ---
-    extinct_now = any(pop[n] < 1 for n in RESIDENT_SPECIES if n in state["seen"])
+    # --- 连续无归零计数（冬眠不算归零） ---
+    extinct_now = any(not _is_present(state, n) for n in RESIDENT_SPECIES if n in state["seen"])
     if extinct_now:
         state["flags"]["days_no_extinction"] = 0
     else:
@@ -1172,6 +1873,16 @@ def tick(state):
 
 def _has_settler(state, name):
     return any(s["name"] == name for s in state.get("settlers", []))
+
+
+def _is_present(state, name):
+    """物种是否仍存在：种群 >= 1，或正在冬眠（暂存数量 >= 1）。
+
+    冬眠中的物种不应被判为归零（item 五：青蛙冬眠不是死亡）。
+    """
+    if state["populations"].get(name, 0) >= 1:
+        return True
+    return state.get("hibernate", {}).get(name, 0) >= 1
 
 
 def _apply_special_effects(state, events, r):
@@ -1358,10 +2069,15 @@ def _folio_update_species(state):
         if e is None:
             e = cod[name] = {"first_day": state["turn"], "first_season": state["season"],
                              "extinct_count": 0, "alive": pop.get(name, 0) >= 1}
-        alive = pop.get(name, 0) >= 1
+        alive = _is_present(state, name)
         if e.get("alive") and not alive:
             e["extinct_count"] = e.get("extinct_count", 0) + 1
-            _chronicle(state, "%s 的身影再也看不到了。" % name)
+            # 归零记录旁追加一句回忆描写（item 31）
+            memory = EXTINCT_MEMORY.get(name)
+            if memory:
+                _chronicle(state, "%s 的身影再也看不到了。%s" % (name, memory))
+            else:
+                _chronicle(state, "%s 的身影再也看不到了。" % name)
         e["alive"] = alive
 
 
@@ -1370,7 +2086,8 @@ def _add_settler(state, name):
     t = SETTLER_TYPES[name]
     state["settlers"].append({
         "name": name, "age": 0, "health": 1.0,
-        "max_age": t["max_age"], "daily_food": dict(t["daily_food"]),
+        "max_age": t["max_age"], "daily_food": dict(t.get("daily_food", {})),
+        "since_hunt": 0,   # 距上次成功捕食的天数（hunter 用）
     })
     rec = state["folio"]["settlers"].setdefault(name, {"times": 0, "max_days": 0})
     rec["times"] += 1
@@ -1382,44 +2099,136 @@ def _add_settler(state, name):
     _chronicle(state, txt.get("arrive_chron", "%s 住了下来，成为池塘的一部分。" % name))
 
 
+# 捕食型定居者的（成功, 失败-猎物在场, 扑空-猎物不在）文案
+SETTLER_HUNT_TEXT = {
+    "翠鸟": (KINGFISHER_HIT, KINGFISHER_MISS, VISITOR_MISS["翠鸟"]),
+    "苍鹭": (HERON_HIT, HERON_MISS, VISITOR_MISS["苍鹭"]),
+}
+
+
+def _pick(r, arr):
+    return arr[r.randint(0, len(arr) - 1)]
+
+
+def _pick_t(state, arr):
+    """按回合数确定性取一条文案（不消耗 PRNG，保持随机流对齐）。"""
+    return arr[state["turn"] % len(arr)]
+
+
+def _pick_idx_avoid(r, n, recent):
+    """随机取一个不在 recent（最近用过）里的索引，避免短期重复。"""
+    choices = [i for i in range(n) if i not in recent]
+    if not choices:
+        choices = list(range(n))
+    return choices[r.randint(0, len(choices) - 1)]
+
+
+# 连续完整描写后的降格简短文案
+SHORT_HUNT = {
+    "hit": "%s照常捕到了一条鱼。",
+    "miss": "%s照常扑了个空。",
+    "absent": "%s在水边守了一阵，没有出手。",
+}
+
+
+def _hunt_emit(state, s, events, r, arr, kind):
+    """发出一条捕食描写：最近 3 条不重复；连续完整描写 3 天后降格/省略（item 8）。
+
+    kind: 'hit' 用 settler_hunt 标签，'miss'/'absent' 用 settler_miss 标签。
+    """
+    tag = "settler_hunt" if kind == "hit" else "settler_miss"
+    if s.get("desc_streak", 0) >= 3:
+        # 连续完整描写已达 3 天：降格为简短一句，偶数回合干脆不出现在文字里
+        if state["turn"] % 2 == 0:
+            return
+        events.append("%s:%s" % (tag, SHORT_HUNT[kind] % s["name"]))
+        return
+    recent = s.setdefault("recent_%s" % kind, [])
+    idx = _pick_idx_avoid(r, len(arr), recent)
+    recent.append(idx)
+    if len(recent) > 3:
+        recent.pop(0)
+    events.append("%s:%s" % (tag, arr[idx]))
+    s["desc_streak"] = s.get("desc_streak", 0) + 1
+
+
+def _settler_hunt(state, s, hunter, events, r):
+    """捕食型定居者（翠鸟/苍鹭）：概率捕食机制（item 13）。
+
+    每天 40% 安静（不出现在描写）、60% 触发捕食尝试；尝试成功率 40%
+    （猎物总数 < 5 时降为 20%），失败 60%。成功扣 1 猎物 + health +0.1；
+    连续 5 天没有成功捕食才开始 health 每天 -0.05。
+    """
+    pop = state["populations"]
+    hit_arr, miss_arr, absent_arr = SETTLER_HUNT_TEXT.get(
+        s["name"], (KINGFISHER_HIT, KINGFISHER_MISS, KINGFISHER_MISS))
+    prey_list = hunter["prey"]
+    if not r.chance(0.6):
+        # 安静的一天：不出现在描写中（同时中断"连续完整描写"计数）
+        s["since_hunt"] = s.get("since_hunt", 0) + 1
+        s["desc_streak"] = 0
+    else:
+        prey_total = sum(pop.get(p, 0) for p in prey_list)
+        if prey_total < 1:
+            # 目标不存在 —— 扑空（专属文案）
+            _hunt_emit(state, s, events, r, absent_arr, "absent")
+            s["since_hunt"] = s.get("since_hunt", 0) + 1
+        else:
+            succ_p = 0.4 if prey_total >= 5 else 0.2
+            if r.chance(succ_p):
+                for p in prey_list:
+                    if pop.get(p, 0) >= 1:
+                        pop[p] = max(0.0, pop[p] - 1)
+                        break
+                s["health"] = round(min(1.0, s["health"] + 0.1), 3)
+                s["since_hunt"] = 0
+                _hunt_emit(state, s, events, r, hit_arr, "hit")
+            else:
+                _hunt_emit(state, s, events, r, miss_arr, "miss")
+                s["since_hunt"] = s.get("since_hunt", 0) + 1
+    # 连续 5 天没有成功捕食才开始每天 -0.05
+    if s.get("since_hunt", 0) >= 5:
+        s["health"] = round(s["health"] - 0.05, 3)
+
+
+def _settler_graze(state, s, events, r):
+    """非捕食型定居者（乌龟/螃蟹/水蛇/野鸭）：按 daily_food 取食，缺食扣 health。"""
+    pop = state["populations"]
+    env = state["env"]
+    short = False
+    for food, amt in s["daily_food"].items():
+        if food == "有机碎屑":
+            if env["detritus"] >= amt:
+                env["detritus"] -= amt
+            else:
+                env["detritus"] = 0.0
+                short = True
+            continue
+        have = pop.get(food, 0)
+        if have >= amt:
+            pop[food] = have - amt
+        else:
+            pop[food] = 0.0
+            short = True
+    if short:
+        s["health"] = round(s["health"] - 0.1, 3)
+
+
 def _process_settlers(state, events, r):
     """定居者每日摄食 + 衰老 + 特殊效果结算（在种群 LV 计算之后）。"""
-    pop = state["populations"]
     env = state["env"]
     survivors = []
     for s in state["settlers"]:
         s["age"] += 1
         name = s["name"]
         cfg = SETTLER_TYPES.get(name, {})
-        # 概率捕食（翠鸟）：每天 prob_food 概率才真正取食；落空不扣食物也不掉血
-        prob = cfg.get("prob_food")
-        feeds = True
-        if prob is not None:
-            if r.chance(prob):
-                if pop.get("鲫鱼", 0) >= 1:
-                    events.append("settler:" + KINGFISHER_HIT[r.randint(0, len(KINGFISHER_HIT) - 1)])
-                else:
-                    events.append("settler:" + KINGFISHER_MISS[r.randint(0, len(KINGFISHER_MISS) - 1)])
-            else:
-                feeds = False  # 空手而归
-        short = False
-        if feeds:
-            for food, amt in s["daily_food"].items():
-                if food == "有机碎屑":
-                    if env["detritus"] >= amt:
-                        env["detritus"] -= amt
-                    else:
-                        env["detritus"] = 0.0
-                        short = True
-                    continue
-                have = pop.get(food, 0)
-                if have >= amt:
-                    pop[food] = have - amt
-                else:
-                    pop[food] = 0.0
-                    short = True
-            if short:
-                s["health"] = round(s["health"] - 0.1, 3)
+        # 冬季变温动物：水蛇不捕食，寒冷消耗 health 每天 -0.02（item 五）
+        if state["season"] == "冬" and name == "水蛇":
+            s["health"] = round(s["health"] - 0.02, 3)
+        elif cfg.get("hunter"):
+            _settler_hunt(state, s, cfg["hunter"], events, r)
+        else:
+            _settler_graze(state, s, events, r)
         # 定居者对环境的持续影响
         tpd = cfg.get("turbidity_per_day")
         if tpd:
@@ -1428,6 +2237,10 @@ def _process_settlers(state, events, r):
             env["detritus"] += cfg["detritus_per_day"]
         if cfg.get("nutrients_per_day"):
             env["nutrients"] += cfg["nutrients_per_day"]
+        # 每日更新万物志最长存活记录（item 6）
+        rec = state["folio"]["settlers"].setdefault(name, {"times": 0, "max_days": 0})
+        if s["age"] > rec.get("max_days", 0):
+            rec["max_days"] = s["age"]
         # 离开判定
         txt = SETTLER_TEXT.get(name, {})
         leave = leave_chron = None
@@ -1438,11 +2251,8 @@ def _process_settlers(state, events, r):
             leave = txt.get("age", "年迈的%s悄然离去。" % name)
             leave_chron = txt.get("age_chron", leave)
         if leave:
-            events.append("settler:" + leave)
+            events.append("settler_leave:" + leave)
             _chronicle(state, leave_chron)
-            rec = state["folio"]["settlers"].setdefault(name, {"times": 0, "max_days": 0})
-            if s["age"] > rec.get("max_days", 0):
-                rec["max_days"] = s["age"]
         else:
             survivors.append(s)
     state["settlers"] = survivors
@@ -1558,38 +2368,31 @@ def _resolve_choice(state, pc, idx, events):
             pop["鲤鱼"] *= 0.6
             msg = "水獭住了几日，鱼群的银光稀疏下来。某天清晨，水面空空的，它走了。"
     elif key == "暴雨":
+        # 暴雨改为持续 1-2 天的过程：营养盐与浑浊度逐日上升，结束后浑浊度沉降
+        _start_weather(state, "暴雨", idx == 1)
         if idx == 1:
-            env["turbidity"] = _clamp(env["turbidity"] + 0.2, 0, 1)
-            env["nutrients"] += 20
-            msg = "你加固了堤岸，雨水顺着岸沿淌开，池水没有浑得太久。"
+            msg = "你加固了堤岸。雨点开始砸下来，但岸沿挡住了大半，应该不会浑得太久。"
         else:
-            env["turbidity"] = _clamp(env["turbidity"] + 0.5, 0, 1)
-            env["nutrients"] += 60
-            msg = "雨砸进池塘，泥沙翻滚，水面变成一片浑黄。"
-        # 连锁：暴雨结算时营养盐额外 +15；若碎屑>40，后续 5 天水华概率 ×2
-        env["nutrients"] += 15
+            msg = "你没有动手。云层压下来，豆大的雨点劈头盖脸地砸进了池塘。"
+        # 连锁：若碎屑>40，后续 5 天水华概率 ×2；暴雨期间可能冲入螃蟹
         if env["detritus"] > 40:
             _chain_set(state, "waterbloom_x2", 5)
-        _chain_set(state, "crab_maybe", 1)  # 暴雨次回合 15% 概率冲入螃蟹
+        _chain_set(state, "crab_maybe", 1)
     elif key == "干旱":
-        # 连锁：标记经历过干旱（蟾蜍解锁），开启 5 天干旱窗口
-        state["flags"]["experienced_drought"] = True
-        _chain_set(state, "drought", 5)
+        # 干旱改为持续 5-7 天的过程：水位缓降、溶氧逐步降低，后几天才影响死亡率
+        state["flags"]["experienced_drought"] = True  # 标记经历过干旱（蟾蜍解锁）
+        _start_weather(state, "干旱", idx == 1)
         if idx == 1:
-            env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - 0.5)
-            msg = "你引来新水，水面慢慢涨回原来的高度，焦渴缓和下来。"
+            msg = "你引来新水补充。水线暂时稳住，但日头还晒着，焦渴只是被缓了缓。"
         else:
-            env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - 2)
-            msg = "水线一天天低下去，池塘变小了。"
+            msg = "你选择静观其变。日光一天天晒着，水线开始一点点往下退。"
     elif key == "热浪":
+        # 热浪改为持续 3-5 天的过程：水温逐日升高、溶氧逐日降低，末日可能翻塘
+        _start_weather(state, "热浪", idx == 1)
         if idx == 1:
-            env["water_temp"] += 3
-            env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - 1)
-            msg = "你撑起一片阴凉，水面烫人的光被挡开一些。"
+            msg = "你撑起一片阴凉，挡开一些烫人的光。但闷热还压在水面上，散不开。"
         else:
-            env["water_temp"] += 6
-            env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - 3)
-            msg = "热浪炙烤，水面蒸腾，鱼儿开始浮头。"
+            msg = "你决定硬扛过去。热空气沉沉地压着池塘，水面一丝风也没有。"
     elif key == "白鹭":
         if idx == 1:
             msg = "你扬起手臂，白鹭展翅而起，修长的身影划过水面，飞远了。"
@@ -1601,12 +2404,11 @@ def _resolve_choice(state, pc, idx, events):
         if idx == 1:
             msg = "你加固了堤岸，洪水被挡在外面。池塘保住了，但也拒绝了河水带来的新生命。"
         else:
-            env["turbidity"] = _clamp(env["turbidity"] + 0.6, 0, 1)
-            env["nutrients"] += 80
-            env["detritus"] += 60
+            # 洪水改为持续 2-3 天的过程：冲击比暴雨更猛，螃蟹冲入保留收留决策
+            _start_weather(state, "洪水", False)
             pop["河蚌"] *= 0.7  # 洪水冲击：河蚌 -30%
-            msg = "你打开了池塘的边界。洪水带来了泥沙、断枝，还有意想不到的来客。"
-            _chain_set(state, "crab_incoming", 2)  # 次回合可能触发螃蟹定居决策
+            msg = "你打开了池塘的边界。浑浊的洪水裹着泥沙、断枝灌了进来，还有意想不到的来客。"
+            _chain_set(state, "crab_incoming", 3)  # 洪水期间可能触发螃蟹定居决策
     elif key == "水华":
         state["flags"]["water_bloom_done"] = True
         _unlock(state, events, "水华危机")
@@ -1706,17 +2508,21 @@ def _random_events(state, events, r, season):
         loss = r.randint(1, 3)  # 始终消耗，维持随机流对齐
         if vcount("翠鸟") >= 5 and can_choose() and _choice_ready(state, "翠鸟定居"):
             _trigger_choice(state, events, "翠鸟定居")
-        else:
+        elif pop.get("鲫鱼", 0) >= 1:
             pop["鲫鱼"] = max(0.0, pop["鲫鱼"] - loss)
             events.append("visitor:一道翠蓝色的影子俯冲而下，水面溅起碎光。%d 条鲫鱼不见了。" % loss)
             _folio_bump(state, "visitors", "翠鸟", "掠食鲫鱼")
+        else:
+            # 池塘里没有鱼 —— 翠鸟扑空（专属文案，校验存在性）
+            events.append("visitor:" + _pick_t(state, VISITOR_MISS["翠鸟"]))
+            _folio_bump(state, "visitors", "翠鸟", "扑空，水里无鱼")
     # 蝙蝠：萤火虫大爆发次日出现概率 ×3
     bat_p = 0.15 if _chain_active(state, "bat_x3") else 0.05
     if vis(bat_p):
-        pop["蚊子"] *= 0.7
-        pop["蜻蜓成虫"] *= 0.85
+        pop["蚊子"] *= 0.9          # 蚊子 -10%（item 七）
+        pop["蜻蜓成虫"] *= 0.95
         events.append("visitor:暮色里，翅膀划过水面，蚊蚋与蜻蜓的振翅声静了下来。")
-        _folio_bump(state, "visitors", "蝙蝠群", "夜捕飞虫")
+        _folio_bump(state, "visitors", "蝙蝠群", "夜捕飞虫（蚊子-10%）")
     if vis(0.05):
         if r.chance(0.3):
             if r.chance(0.5) and pop["鲫鱼"] >= 1:
@@ -1725,6 +2531,9 @@ def _random_events(state, events, r, season):
             elif pop["田鼠"] >= 1:
                 pop["田鼠"] -= 1
                 events.append("visitor:猫扑进芦苇丛，叼出一团灰影。")
+            else:
+                # 鱼和田鼠都不在 —— 扑空（专属文案，校验存在性）
+                events.append("visitor:" + _pick_t(state, VISITOR_MISS["流浪猫"]))
         else:
             events.append("visitor:猫蹲了很久，爪子空落落地收回，转身走掉了。")
         _folio_bump(state, "visitors", "流浪猫", "觊觎鱼和田鼠")
@@ -1736,9 +2545,11 @@ def _random_events(state, events, r, season):
         if can_choose() and _choice_ready(state, "蛇"):
             _trigger_choice(state, events, "蛇")
     if vis(0.02):
-        pop["孑孓"] *= 0.9
-        events.append("visitor:夜色里，一团刺球窸窸窣窣翻着落叶，找小虫。")
-        _folio_bump(state, "visitors", "刺猬", "翻找岸边昆虫")
+        # 刺猬：明确捕食水黾 -2~3（item 七）
+        if pop.get("水黾", 0) >= 1:
+            pop["水黾"] = max(0.0, pop["水黾"] - r.randint(2, 3))
+        events.append("visitor:夜色里，一团刺球窸窸窣窣翻着落叶，找水边的小虫。")
+        _folio_bump(state, "visitors", "刺猬", "捕食水黾")
     if vis(0.02):
         pop["田鼠"] = max(0.0, pop["田鼠"] - r.randint(1, 2))
         events.append("visitor:一道细长的影子追着田鼠窜过，芦苇剧烈摇晃。")
@@ -1780,14 +2591,22 @@ def _random_events(state, events, r, season):
             events.append("legend:一群野鸭落在水面，翅膀收起，暗影沉入水里。天亮时它们飞走，留下一池浑浊。")
             _folio_bump(state, "visitors", "迁徙野鸭群", "粪便使碎屑激增")
 
-    # 环境灾害 —— 受季节影响
-    if season == "夏" and vis(0.03) and can_choose() and _choice_ready(state, "暴雨"):  # 暴雨
+    # 夏季睡莲开花：睡莲 > 30 时每年触发一次（纯描写 + 成就，item 三）
+    if season == "夏" and pop.get("睡莲", 0) > 30:
+        year = state["turn"] // YEAR_LEN
+        if state["flags"].get("lily_bloom_year") != year:
+            state["flags"]["lily_bloom_year"] = year
+            events.append("season:" + SEASON_TEXT["睡莲开花"])
+            _unlock(state, events, "睡莲花开")
+
+    # 环境灾害 —— 受季节影响（已有进行中的灾害时不叠新灾害）
+    no_weather = not state.get("active_weather")
+    if no_weather and season == "夏" and vis(0.03) and can_choose() and _choice_ready(state, "暴雨"):
         _trigger_choice(state, events, "暴雨")
-    if season in ("夏", "秋") and vis(0.02) and can_choose() and _choice_ready(state, "干旱"):  # 干旱
+    if no_weather and season in ("夏", "秋") and vis(0.02) and can_choose() and _choice_ready(state, "干旱"):
         _trigger_choice(state, events, "干旱")
-    if season == "夏" and vis(0.01) and can_choose() and _choice_ready(state, "热浪"):  # 热浪
-        _chain_set(state, "heatwave", 3)  # 热浪窗口，供水华判定
-        _trigger_choice(state, events, "热浪")
+    if no_weather and season == "夏" and vis(0.01) and can_choose() and _choice_ready(state, "热浪"):
+        _trigger_choice(state, events, "热浪")  # 热浪窗口在结算时随灾害时长开启
     if season == "冬" and vis(0.01):  # 寒潮 —— 无需决策
         env["light"] *= 0.3
         env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - 1.5)
@@ -1796,10 +2615,15 @@ def _random_events(state, events, r, season):
 
     # ---- V1.0 扩展：新增访客与环境事件 ----
     # 池鹭（常见 ~10%，春夏秋；捕泥鳅）
-    if season != "冬" and vis(0.10) and pop.get("泥鳅", 0) >= 1:
-        pop["泥鳅"] = max(0.0, pop["泥鳅"] - r.randint(1, 2))
-        events.append("visitor:一只池鹭踩着浮萍边缘，低头盯住水下。长喙一刺，一条泥鳅被叼了起来。")
-        _folio_bump(state, "visitors", "池鹭", "捕食泥鳅")
+    if season != "冬" and vis(0.10):
+        if pop.get("泥鳅", 0) >= 1:
+            pop["泥鳅"] = max(0.0, pop["泥鳅"] - r.randint(1, 2))
+            events.append("visitor:一只池鹭踩着浮萍边缘，低头盯住水下。长喙一刺，一条泥鳅被叼了起来。")
+            _folio_bump(state, "visitors", "池鹭", "捕食泥鳅")
+        else:
+            # 没有泥鳅 —— 池鹭扑空（专属文案，校验存在性）
+            events.append("visitor:" + _pick_t(state, VISITOR_MISS["池鹭"]))
+            _folio_bump(state, "visitors", "池鹭", "扑空，无泥鳅")
     # 燕子（常见 ~8%，春夏；只减蚊子，幅度温和）
     if season in ("春", "夏") and vis(0.08):
         pop["蚊子"] *= 0.9
@@ -1820,8 +2644,8 @@ def _random_events(state, events, r, season):
         events.append("weather:大雾笼罩了池塘。水面不见了，芦苇不见了，一切都化进灰白的模糊里。"
                       "光线穿过浓雾，只剩下朦胧的暗影。")
         _folio_bump(state, "events", "大雾", "光照骤降两三天")
-    # 洪水（稀有 ~0.8%，仅夏；需决策）
-    if season == "夏" and vis(0.008) and can_choose() and _choice_ready(state, "洪水"):
+    # 洪水（稀有 ~0.8%，仅夏；需决策；已有进行中灾害时不叠加）
+    if no_weather and season == "夏" and vis(0.008) and can_choose() and _choice_ready(state, "洪水"):
         _trigger_choice(state, events, "洪水")
     # 水华（自动触发）：热浪窗口 + (营养盐>60 或 碎屑>50) + 水面覆盖>0.6
     bloom_ok = (_chain_active(state, "heatwave")
@@ -1843,15 +2667,24 @@ def _detect_pause(state, events):
     # 物种归零（曾出现过又归零）—— 去重：同一物种只在首次归零提醒，恢复后再归零才再提醒
     alerted = state.setdefault("extinct_alerted", [])
     for name in RESIDENT_SPECIES:
-        if name in state["seen"] and pop[name] < 1:
+        if name in state["seen"] and not _is_present(state, name):
             if name not in alerted:
                 reasons.append("%s 数量归零" % name)
                 alerted.append(name)
-        elif name in alerted and pop[name] >= 1:
+        elif name in alerted and _is_present(state, name):
             # 已恢复：清除标记，下次归零会重新提醒
             alerted.remove(name)
+    # 疫病爆发：在前兆期（第 1 天）暂停一次，给玩家干预窗口（remove/clean）
+    for name, d in state.get("diseases", {}).items():
+        if d.get("elapsed") == 1:
+            reasons.append("%s 爆发疫病（前兆期，可 remove 降密度 / clean 降传播）" % name)
+    # 溶氧危机去重：只在首次跌破时提醒一次，回升到 4 以上才重置（避免持续灾害每天打断 wait）
     if env["dissolved_oxygen"] < 3.0:
-        reasons.append("溶氧危机（%.1f mg/L）" % env["dissolved_oxygen"])
+        if not state["flags"].get("do_alerted"):
+            reasons.append("溶氧危机（%.1f mg/L）" % env["dissolved_oxygen"])
+            state["flags"]["do_alerted"] = True
+    elif env["dissolved_oxygen"] >= 4.0:
+        state["flags"]["do_alerted"] = False
     if reasons:
         state["pending_pause"] = "；".join(dict.fromkeys(reasons))
 
@@ -1891,9 +2724,53 @@ def _check_achievements(state, events):
     # 仙鹤降临、水华危机在对应事件中直接解锁
 
 
+def _year_chronicle_slice(state):
+    """取本年（最近 YEAR_LEN 天）的年鉴记录。"""
+    lo = state["turn"] - YEAR_LEN
+    out = []
+    for e in state.get("chronicle", []):
+        m = re.search(r"第(\d+)天", e)
+        if m and lo < int(m.group(1)) <= state["turn"]:
+            out.append(e)
+    return out
+
+
+def _year_report(state, events):
+    """第 120/240/… 天四季轮回时，用年鉴数据拼接一段年终生态简报（item 28）。"""
+    year = state["turn"] // YEAR_LEN
+    pop = state["populations"]
+    yr = _year_chronicle_slice(state)
+    frags = []
+    disasters = [w for w in ("暴雨", "热浪", "干旱", "洪水", "水华", "翻塘", "寒潮")
+                 if any(w in e for e in yr)]
+    if disasters:
+        frags.append("池塘挺过了" + "、".join(dict.fromkeys(disasters)))
+    discovered = []
+    for e in yr:
+        discovered += re.findall(r"造物名册更新：([一-龥]+)", e)
+    if discovered:
+        frags.append("迎来了" + "、".join(dict.fromkeys(discovered)) + "的现身")
+    here = ["%s定居了 %d 天" % (s["name"], s["age"]) for s in state.get("settlers", [])]
+    if here:
+        frags.append("；".join(here))
+    sp = state["folio"]["species"]
+    revived = [n for n in RESIDENT_SPECIES
+               if sp.get(n, {}).get("extinct_count", 0) >= 1 and pop.get(n, 0) >= 1]
+    if revived:
+        frags.append("、".join(revived[:3]) + "归零之后又重新出现")
+    alive_count = sum(1 for n in RESIDENT_SPECIES if pop.get(n, 0) >= 1)
+    body = ("；".join(frags) + "。") if frags else "池塘平静地走过了四季，没有大起大落。"
+    events.append("report:第 %d 年终了。这一年，%s如今池塘里还活跃着 %d 种生灵。"
+                  % (year, body, alive_count))
+
+
 def _unlock(state, events, name):
     if name not in state["achievements"]:
         state["achievements"].append(name)
+    # 成就提示去重：已提示过的不再弹（import 存档后不重复弹，见 achievements_alerted）
+    alerted = state.setdefault("achievements_alerted", [])
+    if name not in alerted:
+        alerted.append(name)
         events.append("achievement:🏆 解锁成就【%s】%s" % (name, ACHIEVEMENTS.get(name, "")))
 
 
@@ -1902,7 +2779,22 @@ def _unlock(state, events, name):
 # ---------------------------------------------------------------------------
 
 def _ipop(state, name):
-    return int(round(state["populations"][name]))
+    # 归零判定统一：种群小数 < 1 时一律显示为 0，而非四舍五入到 1（item 8）
+    x = state["populations"][name]
+    return 0 if x < 1 else int(round(x))
+
+
+def _unlocked_set(state):
+    return set(state.get("unlocked_species", []))
+
+
+def _health_word(h):
+    """定居者健康的定性描述（item 29）：observe 的 JSON 仍保留精确数值。"""
+    if h > 0.7:
+        return "健康"
+    if h >= 0.3:
+        return "衰弱"
+    return "危急"
 
 
 def _status_bar(state):
@@ -1920,9 +2812,13 @@ def _status_bar(state):
         "nutrients": round(env["nutrients"], 0),
         "detritus": round(env["detritus"], 0),
         "turbidity": round(env["turbidity"], 2),
-        "pop": {n: int(round(pop[n])) for n in RESIDENT_SPECIES if pop[n] >= 1},
+        # 只含已解锁且种群 >= 1 的物种；未解锁或归零（<1）的不出现在 JSON 里（item 1/8）
+        "pop": {n: int(round(pop[n])) for n in RESIDENT_SPECIES
+                if n in _unlocked_set(state) and pop[n] >= 1},
         "unlocked": list(state.get("unlocked_species", [])),
-        "settlers": [{"name": s["name"], "health": s["health"]} for s in state.get("settlers", [])],
+        # observe 的 JSON 保留定居者精确健康数值（item 29）
+        "settlers": [{"name": s["name"], "health": round(s["health"], 3),
+                      "age": s["age"]} for s in state.get("settlers", [])],
         "pending_choice": bool(pc),
         "choices": list(pc["choices"]) if pc else [],
         "events": [
@@ -1938,7 +2834,8 @@ EVENT_ICONS = {
     "season": "🍃", "visitor": "🐾", "legend": "✨", "disaster": "⛈",
     "crisis": "⚠️", "lifecycle": "🦋", "spawn": "🥚", "achievement": "🏆",
     "discover": "🔎", "choice": "❓", "choice_auto": "⌛", "settler": "🐢",
-    "weather": "🌫",
+    "settler_hunt": "🐟", "settler_miss": "💨", "settler_leave": "🚪",
+    "weather": "🌫", "report": "📅", "disease": "🦠",
 }
 
 # 生物访客/灾害事件识别表：(body 关键片段, 标题名, 事件类型, 影响描述)
@@ -2009,6 +2906,12 @@ def _classify_event(ev):
             if v["desc"] == body:
                 name = "入" + s
                 break
+        else:
+            # 季节性自动事件文案（蛙醒/睡莲抽芽/芦苇枯黄/睡莲开花等）
+            for k, txt in SEASON_TEXT.items():
+                if txt == body:
+                    name = k
+                    break
         meta["name"] = name
     elif tag == "lifecycle":
         m = re.search(r"(\d+)\s*只(.+?)悄然变了形态，化作(.+)", body)
@@ -2042,10 +2945,31 @@ def _classify_event(ev):
     elif tag == "settler":
         meta["name"] = "流浪乌龟离开" if "乌龟" in body else "定居者离开"
         meta["effect"] = "离开池塘"
+    elif tag == "settler_hunt":
+        who = next((n for n in ("翠鸟", "苍鹭") if n in body), "定居者")
+        meta["name"] = who + "捕食"
+        meta["effect"] = "捕食成功"
+    elif tag == "settler_miss":
+        who = next((n for n in ("翠鸟", "苍鹭") if n in body), "定居者")
+        meta["name"] = who + "扑空"
+        meta["effect"] = "扑空"
+    elif tag == "settler_leave":
+        who = next((n for n in SETTLER_TYPES if n in body), "定居者")
+        meta["name"] = who + "离开"
+        meta["effect"] = "离开池塘"
     elif tag == "achievement":
         m = re.search(r"【(.+?)】", body)
         meta["name"] = m.group(1) if m else "成就"
         meta["effect"] = "解锁成就"
+    elif tag == "report":
+        meta["name"] = "年终生态简报"
+        meta["effect"] = "一年回顾"
+    elif tag == "weather":
+        meta["name"] = "天气"
+        meta["effect"] = ""
+    elif tag == "disease":
+        meta["name"] = "疫病"
+        meta["effect"] = "疫病"
     elif tag in ("choice", "choice_auto"):
         meta["name"] = _choice_title_from_text(body)
         meta["effect"] = "等待抉择" if tag == "choice" else "超时自动结算"
@@ -2063,7 +2987,16 @@ def _classify_event(ev):
                     meta["effect"] = eff or ""
                 break
         else:
-            meta["name"] = "访客来访" if tag == "visitor" else "异象"
+            # 表中未命中：尝试从正文里识别访客主体（含扑空专属文案）
+            sub = next((v for v in ("翠鸟", "苍鹭", "池鹭", "白鹭", "流浪猫")
+                        if v in body), None)
+            if sub and tag == "visitor":
+                meta["name"] = sub + "来访"
+                meta["subject"] = sub
+                meta["effect"] = "扑空" if ("没有" in body or "空" in body
+                                            or "什么也" in body) else ""
+            else:
+                meta["name"] = "访客来访" if tag == "visitor" else "异象"
     else:
         meta["name"] = "事件"
     return meta
@@ -2082,18 +3015,64 @@ def _render_events(events):
     return lines
 
 
-def _observe_text(state, events):
+def _observe_ambient(state):
+    """observe 的动态主描写（item 15/21）。
+
+    优先级：灾害进行中 > 危机状态（低溶氧）> 高生物多样性 > 定居者存在
+            > 高浮萍 > 高营养盐 > 高碎屑 > 默认。
+    """
+    aw = state.get("active_weather")
+    if aw:
+        return _pick_t(state, WEATHER_ONGOING[aw["kind"]])
+    env = state["env"]
     pop = state["populations"]
+    if env["dissolved_oxygen"] < 4.0:
+        return _pick_t(state, OBSERVE_AMBIENT["low_do"])
+    alive = [n for n in RESIDENT_SPECIES
+             if n in _unlocked_set(state) and pop.get(n, 0) >= 1]
+    if len(alive) > 10:
+        return _pick_t(state, OBSERVE_AMBIENT["biodiverse"])
+    if state.get("settlers"):
+        return _pick_t(state, OBSERVE_AMBIENT["settler"])
+    if _surface_cover(state) > 0.7:
+        return _pick_t(state, OBSERVE_AMBIENT["high_cover"])
+    if env["nutrients"] > 80:
+        return _pick_t(state, OBSERVE_AMBIENT["high_nutrients"])
+    if env["detritus"] > 60:
+        return _pick_t(state, OBSERVE_AMBIENT["high_detritus"])
+    return _pick_t(state, OBSERVE_AMBIENT["default"])
+
+
+def _water_degrade_lines(state):
+    """水质恶化的简短叙事反馈（item 16），与 gaze 环境描写对齐但更短。"""
+    env = state["env"]
+    out = []
+    if env["nutrients"] > 80:
+        out.append("· " + _pick_t(state, WATER_DEGRADE["green"]))
+    if env["turbidity"] > 0.4:
+        out.append("· " + _pick_t(state, WATER_DEGRADE["turbid"]))
+    if env["detritus"] > 60:
+        out.append("· " + _pick_t(state, WATER_DEGRADE["smell"]))
+    if env["nutrients"] > 120:
+        out.append("· " + _pick_t(state, WATER_DEGRADE["foam"]))
+    return out
+
+
+def _observe_text(state, events):
     lines = []
     lines.append("【第 %d 天 · %s】" % (state["turn"], state["season"]))
     rendered = _render_events(events)
     if rendered:
         lines.extend(rendered)
-    else:
-        lines.append("· 水面如镜，只有光线在水底缓缓移动。")
-    # 简短变化描述
+    # 动态主描写（替代静态"水面如镜"，按当前最显著状态选择）
+    lines.append("· " + _observe_ambient(state))
+    # 水质恶化叙事反馈
+    lines.extend(_water_degrade_lines(state))
+    # 简短变化描述（只列已解锁物种，归零的不计）
     notable = []
-    for name in ("水藻", "水蚤", "鲫鱼", "青蛙", "蚊子", "鲤鱼"):
+    for name in ("水藻", "水蚤", "鲫鱼", "青蛙", "鲤鱼"):
+        if name not in _unlocked_set(state):
+            continue
         v = _ipop(state, name)
         if v > 0:
             notable.append("%s%d" % (name, v))
@@ -2130,8 +3109,25 @@ def cmd(command):
     if not parts:
         return _help_text()
     outputs = []
+    skipped = []
     for part in parts:
+        # 决策待定时，明确回报被跳过的推进/干预类指令（item 12），不逐条重复阻塞文案
+        if state.get("pending_choice"):
+            tokens = part.split()
+            verb = tokens[0].lower() if tokens else ""
+            is_choose = verb in CHOOSE_VERBS
+            is_ok = verb in PENDING_OK_VERBS
+            is_bare = (not is_choose and not is_ok
+                       and _parse_choice(tokens, state["pending_choice"]["choices"]) is not None)
+            if not (is_choose or is_ok or is_bare):
+                skipped.append(part)
+                continue
         outputs.append(_exec_one(state, part))
+    if skipped:
+        note = "⏸ 当前有待决策事件，以下指令未执行：" + " | ".join(skipped)
+        if state.get("pending_choice"):
+            note += "\n" + _choice_prompt(state["pending_choice"])
+        outputs.append(note)
     save_state(state)
     return "\n\n".join(outputs)
 
@@ -2211,6 +3207,8 @@ def _advance(state, days):
     key_events = []
     morph = {}          # 变态聚合：into 物种 -> 累计数量
     visits = {}         # 访客聚合：访客名 -> 次数
+    hunt_hit = {}       # 定居者捕食成功聚合：定居者名 -> 次数（= 捕到的鱼数）
+    hunt_miss = {}      # 定居者扑空聚合：定居者名 -> 次数
     fish_taken = 0      # 翠鸟叼走的鲫鱼累计
     actual = 0
     paused_choice = False
@@ -2235,7 +3233,14 @@ def _advance(state, days):
                     fm = re.search(r"(\d+)\s*条鲫鱼", meta["body"])
                     if fm:
                         fish_taken += int(fm.group(1))
-            elif tag in ("crisis", "disaster", "legend", "achievement", "discover", "settler"):
+            elif tag == "settler_hunt":
+                who = next((n for n in ("翠鸟", "苍鹭") if n in meta["body"]), "定居者")
+                hunt_hit[who] = hunt_hit.get(who, 0) + 1
+            elif tag == "settler_miss":
+                who = next((n for n in ("翠鸟", "苍鹭") if n in meta["body"]), "定居者")
+                hunt_miss[who] = hunt_miss.get(who, 0) + 1
+            elif tag in ("crisis", "disaster", "legend", "achievement",
+                         "discover", "settler", "settler_leave", "report"):
                 key_events.append("第%d天 %s" % (state["turn"], meta["body"]))
         # 决策事件：立即暂停，记录剩余天数
         if state.get("pending_choice"):
@@ -2261,13 +3266,32 @@ def _advance(state, days):
             else:
                 parts.append("%s来访 %d 次" % (vname, cnt))
         lines.append("期间" + "；".join(parts) + "。")
+    # 定居者捕食汇总（聚合显示，不逐天列出，item 8）
+    if hunt_hit or hunt_miss:
+        who_all = list(dict.fromkeys(list(hunt_hit) + list(hunt_miss)))
+        segs = []
+        for who in who_all:
+            hit = hunt_hit.get(who, 0)
+            miss = hunt_miss.get(who, 0)
+            prey = "泥鳅或鲫鱼" if who == "苍鹭" else "鲫鱼"
+            segs.append("%s捕到了 %d 条%s，扑空了 %d 次" % (who, hit, prey, miss))
+        lines.append("期间" + "；".join(segs) + "。")
+    # 持续性灾害进行中：wait 摘要里显式提示（item 21）
+    aw = state.get("active_weather")
+    if aw:
+        lines.append("⛅ %s仍在持续（第 %d/%d 天）。" % (aw["kind"], aw["elapsed"], aw["duration"]))
+    # 疫病进行中
+    if state.get("diseases"):
+        lines.append("🦠 疫病进行中：" + "、".join(
+            "%s(第%d/%d天)" % (n, d["elapsed"], d["duration"])
+            for n, d in state["diseases"].items()) + "。")
     if paused_choice:
         lines.append("⏸ 池塘边发生了一件需要你决定的事：")
         lines.append(_choice_prompt(state["pending_choice"]))
     elif state["pending_pause"]:
         lines.append("⚠️ 自动暂停：%s" % state["pending_pause"])
         state["pending_pause"] = None
-    elif not (key_events or morph or visits):
+    elif not (key_events or morph or visits or hunt_hit or hunt_miss):
         lines.append("日子平静地流过，无事发生。")
     return "\n".join(lines)
 
@@ -2282,8 +3306,9 @@ def _cmd_wait(state, args):
     state["pending_wait_days"] = 0
     notice = ""
     if days > MAX_WAIT_DAYS:
+        # 超限不再"拒绝并只推进 1 天"，而是按 7 天执行并提示（item 11）
         days = MAX_WAIT_DAYS
-        notice = "造物主一次最多能观望七日的光阴。\n"
+        notice = "一次最多观望七日，已为你观望七日。\n"
     text = _advance(state, days)
     return notice + text + "\n" + _status_bar(state)
 
@@ -2316,11 +3341,12 @@ def _cmd_summon(state, args):
     if not args:
         return "用法：summon [物种] [数量]"
     name = _resolve_species(args[0])
-    qty = 0
+    qty = 10
     if len(args) >= 2 and args[1].lstrip("-").isdigit():
         qty = int(args[1])
-    else:
-        qty = 10
+        # 拒绝零与负数（item 10）
+        if qty <= 0:
+            return "数量必须大于零。"
     if name is None:
         # 不限制：未知物种，自然规律当裁判 —— 直接告知它无法在池塘存活
         return "你投下%s，它在水中闪烁一下，便消散了。" % args[0]
@@ -2387,6 +3413,8 @@ def _cmd_clean(state, args):
     pop["细菌"] *= 0.5
     state["env"]["detritus"] *= 0.7
     state["env"]["turbidity"] = _clamp(state["env"]["turbidity"] - 0.2, 0, 1)
+    # 换水降低疫病传播概率（持续 3 天）
+    _chain_set(state, "sanitized", 3)
     _mark_intervention(state, True)
     return "🧹 你捞走水藻，换了水。池水清澈起来，但许多微小的生命也随之流走了。"
 
@@ -2399,30 +3427,40 @@ def _cmd_status(state):
     lines.append("─ 环境参数 ─")
     lines.append("  水温 %.1f℃ | 溶氧 %.1f mg/L | 光照 %.2f" % (env["water_temp"], env["dissolved_oxygen"], env["light"]))
     lines.append("  营养盐 %.0f | 有机碎屑 %.0f | 浑浊度 %.2f" % (env["nutrients"], env["detritus"], env["turbidity"]))
-    lines.append("─ 种群数量 ─")
+    lines.append("─ 种群数量 ─（仅显示已解锁物种）")
+    unlocked = _unlocked_set(state)
     by_troph = {}
     for name in RESIDENT_SPECIES:
         by_troph.setdefault(SPECIES[name]["trophic"], []).append(name)
     troph_label = {"producer": "生产者", "primary": "初级消费者",
                    "secondary": "次级消费者", "apex": "顶级捕食者", "decomposer": "分解者"}
     for troph in ("producer", "primary", "secondary", "apex", "decomposer"):
-        names = by_troph.get(troph, [])
-        seg = "  ".join("%s:%d" % (n, int(round(pop[n]))) for n in names)
-        lines.append("  [%s] %s" % (troph_label[troph], seg))
-    # 隐形变量
-    lines.append("  [空中] 蚊子:%d  蜻蜓成虫:%d" % (int(round(pop["蚊子"])), int(round(pop["蜻蜓成虫"]))))
+        names = [n for n in by_troph.get(troph, []) if n in unlocked]
+        locked = [n for n in by_troph.get(troph, []) if n not in unlocked]
+        seg = "  ".join("%s:%d" % (n, _ipop(state, n)) for n in names) or "（暂无）"
+        tail = "  ＋%d 未解锁(???)" % len(locked) if locked else ""
+        lines.append("  [%s] %s%s" % (troph_label[troph], seg, tail))
+    # 持续灾害提示
+    aw = state.get("active_weather")
+    if aw:
+        lines.append("─ 天气 ─")
+        lines.append("  ⛅ %s进行中（第 %d/%d 天）" % (aw["kind"], aw["elapsed"], aw["duration"]))
     lines.append("已解锁成就：%d/%d" % (len(state["achievements"]), len(ACHIEVEMENTS)))
     lines.append(_status_bar(state))
     return "\n".join(lines)
 
 
 def _cmd_encyclopedia(state):
+    # 图鉴计数与万物志对齐：已解锁且曾出现过（pop 曾 >= 1）才算"已出现"（item 9）
+    unlocked = _unlocked_set(state)
+    seen = state.get("seen", [])
+    appeared = [n for n in RESIDENT_SPECIES if n in seen and n in unlocked]
     lines = ["📖 图鉴"]
-    lines.append("已出现物种（%d/%d）：" % (len(state["seen"]), len(RESIDENT_SPECIES)))
-    lines.append("  " + ("、".join(state["seen"]) if state["seen"] else "（暂无）"))
-    未见 = [n for n in RESIDENT_SPECIES if n not in state["seen"]]
-    if 未见:
-        lines.append("  未发现：" + "、".join("?" * 0 or n for n in 未见))
+    lines.append("已出现物种（%d/%d）：" % (len(appeared), len(RESIDENT_SPECIES)))
+    lines.append("  " + ("、".join(appeared) if appeared else "（暂无）"))
+    hidden = len(RESIDENT_SPECIES) - len(appeared)
+    if hidden:
+        lines.append("  尚未现身：%d 种（??? —— 还在水底的迷雾里等待被发现）" % hidden)
     lines.append("")
     lines.append("🏆 成就（%d/%d）：" % (len(state["achievements"]), len(ACHIEVEMENTS)))
     for name, cond in ACHIEVEMENTS.items():
@@ -2465,10 +3503,15 @@ def _cmd_folio(state):
     if cod["settlers"]:
         lines.append("─ 定居者志 ─")
         for name, rec in cod["settlers"].items():
-            cur = sum(1 for s in state["settlers"] if s["name"] == name)
+            here = [s for s in state["settlers"] if s["name"] == name]
+            if here:
+                # 当前在塘：用定性词描述健康（item 29）
+                state_word = "（当前在塘 · %s）" % "、".join(
+                    "%s第%d天%s" % (name, s["age"], _health_word(s["health"])) for s in here)
+            else:
+                state_word = ""
             lines.append("  【%s】定居 %d 次 · 最长存活 %d 天%s" % (
-                name, rec.get("times", 0), rec.get("max_days", 0),
-                "（当前在塘）" if cur else ""))
+                name, rec.get("times", 0), rec.get("max_days", 0), state_word))
 
     # —— 访客志 ——
     if cod["visitors"]:
@@ -2547,20 +3590,50 @@ def _cmd_gaze(state):
             else:
                 lines.append(_gaze_pick(r, GAZE_SUBJECT[n]))
 
-    # 定居者也要入画
+    # 冬季：青蛙在冬眠，不描写活动，只点出泥底下的越冬者
+    if season == "冬" and state.get("hibernate", {}).get("青蛙", 0) > 0:
+        lines.append(_gaze_pick(r, GAZE_HIBERNATE))
+
+    # 定居者也要入画（最近 3 条不重复，item 8）
     for s in state.get("settlers", []):
         tmpl = GAZE_SETTLER.get(s["name"])
         if tmpl:
-            lines.append(_gaze_pick(r, tmpl))
+            recent = s.setdefault("recent_gaze", [])
+            idx = _pick_idx_avoid(r, len(tmpl), recent)
+            recent.append(idx)
+            if len(recent) > 3:
+                recent.pop(0)
+            lines.append(tmpl[idx])
 
     commit_rng(state, r)
     return "\n".join(lines)
 
 
+def _look_settler(state, s):
+    """look 一名定居者：习性、食谱、定居天数、当前健康（item 30）。"""
+    name = s["name"]
+    cfg = SETTLER_TYPES.get(name, {})
+    lines = ["【%s】定居者" % name]
+    if name in SETTLER_HABIT:
+        lines.append("  " + SETTLER_HABIT[name])
+    if cfg.get("hunter"):
+        diet = "、".join(cfg["hunter"]["prey"]) + "（伺机捕食，捕到才恢复体力）"
+    else:
+        diet = "、".join(s.get("daily_food", {}).keys()) or "—"
+    lines.append("  食谱：" + diet)
+    lines.append("  定居天数：第 %d 天（寿命上限约 %d 天）" % (s["age"], s.get("max_age", cfg.get("max_age", 0))))
+    lines.append("  当前健康：%s" % _health_word(s["health"]))
+    return "\n".join(lines)
+
+
 def _cmd_look(state, args):
     if not args:
-        return "用法：look [物种/季节]"
-    key = args[0]
+        return "用法：look [物种/季节/定居者]"
+    key = args[0].strip()
+    # 定居者优先（翠鸟/苍鹭等可能与访客同名，在塘的以定居者身份展示）
+    for s in state.get("settlers", []):
+        if s["name"] == key:
+            return _look_settler(state, s)
     # 季节
     if key in SEASON_ENV:
         e = SEASON_ENV[key]
@@ -2600,6 +3673,13 @@ def _lite_snapshot(state):
         "unlocked_species": state["unlocked_species"],
         "seen": state.get("seen", []),
         "max_seen": {k: round(v, 1) for k, v in state["max_seen"].items()},
+        "achievements": state.get("achievements", []),
+        "achievements_alerted": state.get("achievements_alerted", []),
+        "active_weather": state.get("active_weather"),
+        "hibernate": state.get("hibernate", {}),
+        "diseases": state.get("diseases", {}),
+        "disease_immune": state.get("disease_immune", {}),
+        "extinct_alerted": state.get("extinct_alerted", []),
         "pending_choice": state.get("pending_choice"),
         "pending_wait_days": state.get("pending_wait_days", 0),
         "choice_cooldowns": state.get("choice_cooldowns", {}),
@@ -2631,6 +3711,13 @@ def _restore_from_lite(data):
     base["seen"] = data.get("seen", [n for n in RESIDENT_SPECIES
                                       if base["populations"].get(n, 0) >= 1])
     base["max_seen"] = data.get("max_seen", {})
+    base["achievements"] = data.get("achievements", [])
+    base["achievements_alerted"] = data.get("achievements_alerted", list(base["achievements"]))
+    base["active_weather"] = data.get("active_weather")
+    base["hibernate"] = data.get("hibernate", {})
+    base["diseases"] = data.get("diseases", {})
+    base["disease_immune"] = data.get("disease_immune", {})
+    base["extinct_alerted"] = data.get("extinct_alerted", [])
     base["pending_choice"] = data.get("pending_choice")
     base["pending_wait_days"] = data.get("pending_wait_days", 0)
     base["choice_cooldowns"] = data.get("choice_cooldowns", {})
