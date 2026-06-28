@@ -1,0 +1,12 @@
+# Python
+__pycache__/
+*.pyc
+
+# 运行时存档
+eco_save.json
+
+# 本地开发文件，不发布
+DESIGN_v4.md
+text_templates_v2.md
+test_longrun.py
+test_staged.py
