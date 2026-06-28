@@ -252,8 +252,9 @@ SETTLER_TYPES = {
             "juvenile_days": 15, "max_count": 8},
     # 访客变常驻 —— 捕食型定居者（hunter）：按概率捕食，详见 _process_settlers
     #   每天 40% 安静（不出现在描写中），60% 触发捕食尝试；
-    #   尝试成功率 40%（猎物总数 < 5 时降为 20%）；
-    #   成功扣 1 猎物 + health 恢复 0.1；连续 5 天无成功才 health 每天 -0.05。
+    #   尝试成功率 40%（猎物总数 < 5 时降为 20%；冬季翠鸟额外降到 15%）；
+    #   成功扣 1 猎物 + health 恢复 0.1；连续 3 天无成功开始掉血
+    #   （第 3~5 天 -0.05/天，第 6 天起 -0.1/天）。
     "翠鸟": {"max_age": 200, "hunter": {"prey": ["鲫鱼"]},
             "brood_food": {"鲫鱼": 1}, "juvenile_days": 20, "max_count": 4},
     "苍鹭": {"max_age": 180, "hunter": {"prey": ["鲫鱼", "泥鳅"]},
@@ -1187,6 +1188,7 @@ def fresh_state(seed):
             "events": {},            # 事件志：key -> {count, notes}
         },
         "chronicle": [],             # 年鉴：已格式化的时间线文本
+        "key_chronicle": [],         # 关键事件年鉴（解锁/归零/定居者来去/灾害/成就/季节）—— export lite 保留
         "pending_choice": None,      # 待决策事件 dict，或 None
         "pending_wait_days": 0,      # 决策中断的 wait 剩余天数
         "choice_cooldowns": {},      # 决策事件 -> 上次触发的回合（冷却用）
@@ -1257,6 +1259,7 @@ def _migrate(state):
     for book in ("species", "settlers", "visitors", "events"):
         cod.setdefault(book, {})
     state.setdefault("chronicle", [])
+    state.setdefault("key_chronicle", [])
     state.setdefault("pending_choice", None)
     state.setdefault("pending_wait_days", 0)
     state.setdefault("choice_cooldowns", {})
@@ -1371,9 +1374,9 @@ def _process_weather(state, events):
         env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - drop)
         env["nutrients"] += 1.0 * sev
     elif kind == "热浪":
-        # 水温逐日升高、溶氧逐日降低
+        # 水温逐日升高；溶氧每天 -1.5（item D2：加重热浪。mitigated 时减半）
         env["water_temp"] = _clamp(env["water_temp"] + (1.0 + 0.3 * day) * sev, 0.0, 42.0)
-        env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - (0.5 + 0.2 * day) * sev)
+        env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - 1.5 * sev)
     elif kind == "暴雨":
         env["turbidity"] = _clamp(env["turbidity"] + 0.2 * sev, 0.0, 1.0)
         env["nutrients"] += 22 * sev
@@ -1781,6 +1784,13 @@ def tick(state):
     # 结冰阻断气体交换：溶氧每天额外 -0.5（与浮萍覆盖叠加，item 五）
     if ice:
         env["dissolved_oxygen"] -= 0.5
+    # 浮萍 / 睡莲覆盖收紧（item D4）：覆盖 70% 起溶氧每天 -0.3；
+    # 90% 以上彻底封住水面，溶氧每天 -1.0 且光照压到 0.1。
+    if duckweed_cover >= 0.9:
+        env["dissolved_oxygen"] -= 1.0
+        env["light"] = min(env["light"], 0.1)
+    elif duckweed_cover >= 0.7:
+        env["dissolved_oxygen"] -= 0.3
     env["dissolved_oxygen"] = _clamp(env["dissolved_oxygen"], 0.0, 16.0)
 
     # 冬季睡莲枯萎到 0（来年春天从根茎恢复，见 _season_events）
@@ -1801,6 +1811,8 @@ def tick(state):
 
     # --- (2) 生产者 Logistic 增长 ---
     temp_factor = _clamp(1 - abs(env["water_temp"] - 24) / 30, 0.2, 1.0)
+    # 干旱期间水容量视为减半：所有物种 max_capacity 临时 ×0.5（item D2：加重干旱）
+    drought_cap = 0.5 if _chain_active(state, "drought") else 1.0
     for name in ("水藻", "浮萍", "睡莲", "芦苇"):
         sp = SPECIES[name]
         n = pop[name]
@@ -1818,13 +1830,18 @@ def tick(state):
                 * (0.7 + 0.3 * target["light"])
         else:  # 芦苇 受季节影响小
             k = sp["max_capacity"] * temp_factor
-        k = max(1.0, k)
+        k = max(1.0, k * drought_cap)
         sbf = _season_birth_factor(state, name, season)
         growth = sp["birth_rate"] * sbf * temp_factor * n * (1 - n / k)
         death = sp["death_rate"] * _season_death_factor(name, season, turn) * n
         pop[name] = max(0.0, n + growth - death)
-        if name == "水藻":
-            env["nutrients"] = max(0.0, env["nutrients"] - growth * 0.05)
+        # 死亡→恶化连锁：水生植物枯死的生物量也沉为有机碎屑（item D1）
+        if name in ("水藻", "浮萍", "睡莲") and death > 0:
+            env["detritus"] += death * 0.2
+        # 光合吸收：水生植物生长时消耗营养盐（item 8：营养盐不再只涨不降）。
+        # 用 max(0, growth) 防止藻量超过承载上限（growth 为负）时反向"返还"营养盐。
+        if name in ("水藻", "浮萍", "睡莲"):
+            env["nutrients"] = max(0.0, env["nutrients"] - max(0.0, growth) * 0.05)
 
     # --- (3) 捕食（Lotka-Volterra 简化） ---
     consumed_detritus = 0.0
@@ -1923,12 +1940,15 @@ def tick(state):
         # 水蚯蚓充足时泥鳅食物丰沛，繁殖 ×1.2
         if name == "泥鳅" and pop.get("水蚯蚓", 0) > 100:
             br *= 1.2
-        k = sp["max_capacity"]
+        k = sp["max_capacity"] * drought_cap   # 干旱水容量减半（item D2）
         births = br * n * (1 - n / max(1.0, k))
         deaths = sp["death_rate"] * _season_death_factor(name, season, turn) * n
         # 低溶氧致死
         if sp.get("needs_oxygen") and env["dissolved_oxygen"] < 4.0:
             deaths += n * (4.0 - env["dissolved_oxygen"]) / 4.0 * 0.5
+        # 溶氧低于 3 时鱼类死亡率 ×3（鲫鱼 / 鲤鱼 / 泥鳅，item D2）
+        if name in FISH and env["dissolved_oxygen"] < 3.0:
+            deaths *= 3.0
         # 水黾：浮萍覆盖过高没有活动空间，死亡率翻倍
         cdp = sp.get("cover_death_penalty")
         if cdp and _surface_cover(state) > cdp["threshold"]:
@@ -1983,6 +2003,23 @@ def tick(state):
                 env["detritus"] += lost * 0.5
         events.append("crisis:水里像被抽走了呼吸，鱼纷纷浮起，白腹朝天。")
         _unlock(state, events, "翻塘")
+    # 溶氧跌破 1.5：彻底翻塘——所有鱼类一次性 -50%（item D2）。
+    # 去重：触发一次后置标记，溶氧回到 3 以上才重置，避免每天重复打断。
+    if env["dissolved_oxygen"] < 1.5:
+        if not state["flags"].get("turnover_alerted"):
+            killed = 0.0
+            for name in FISH:
+                lost = pop.get(name, 0) * 0.5
+                pop[name] = max(0.0, pop.get(name, 0) - lost)
+                env["detritus"] += lost * 0.5
+                killed += lost
+            state["flags"]["turnover_alerted"] = True
+            if killed >= 1:
+                events.append("crisis:溶氧跌到了谷底，水面成片翻起白肚。"
+                              "这一夜过后，池塘里的鱼几乎死绝了。")
+                _unlock(state, events, "翻塘")
+    elif env["dissolved_oxygen"] >= 3.0:
+        state["flags"]["turnover_alerted"] = False
 
     # 营养盐缓慢自然流失 / 上限
     env["nutrients"] = _clamp(env["nutrients"], 0.0, 500.0)
@@ -2153,6 +2190,13 @@ def _process_spawning(state, events, season):
         eggs = pop["青蛙"] * 5
         pop[fr["into"]] += eggs
         events.append("spawn:春日的光下，青蛙寻得水域产卵，%d 只蝌蚪孵了出来。" % int(eggs))
+    # 蝌蚪一旦产出（种群 > 0）即纳入名册与图鉴，使 status / folio 能显示其数量（item 2）
+    if fr and pop.get(fr["into"], 0) >= 1:
+        into = fr["into"]
+        if into not in state["unlocked_species"]:
+            state["unlocked_species"].append(into)
+        if into not in state["seen"]:
+            state["seen"].append(into)
     # 蜻蜓成虫秋季产卵
     asp = SPECIES["蜻蜓成虫"].get("autumn_spawn")
     if asp and season == asp["season"] and turn % SEASON_LEN == 1 and pop["蜻蜓成虫"] >= 1:
@@ -2165,9 +2209,17 @@ def _process_spawning(state, events, season):
 # 7b. v4：年鉴 / 万物志 / 定居者 / 发现制 / 决策
 # ---------------------------------------------------------------------------
 
-def _chronicle(state, text):
-    """向年鉴追加一条时间线记录。"""
-    state["chronicle"].append("%s 第%d天：%s" % (state["season"], state["turn"], text))
+def _chronicle(state, text, key=True):
+    """向年鉴追加一条时间线记录。
+
+    key=True 的记录同时进入 key_chronicle（关键事件：解锁/归零/定居者来去/灾害/
+    决策/季节更替），供 export lite 保留；key=False 为日常记录（如定居者食物预警），
+    只进完整年鉴。绝大多数 _chronicle 调用本就是关键事件，故默认 key=True。
+    """
+    line = "%s 第%d天：%s" % (state["season"], state["turn"], text)
+    state["chronicle"].append(line)
+    if key:
+        state.setdefault("key_chronicle", []).append(line)
 
 
 def _folio_bump(state, book, key, note=None):
@@ -2323,8 +2375,9 @@ def _settler_hunt(state, s, hunter, events, r):
     """捕食型定居者（翠鸟/苍鹭）：概率捕食机制（item 13）。
 
     每天 40% 安静（不出现在描写）、60% 触发捕食尝试；尝试成功率 40%
-    （猎物总数 < 5 时降为 20%），失败 60%。成功扣 1 猎物 + health +0.1；
-    连续 5 天没有成功捕食才开始 health 每天 -0.05。
+    （猎物总数 < 5 时降为 20%；冬季翠鸟额外压到 15%），失败 60%。成功扣 1
+    猎物 + health +0.1；连续 3 天没成功捕食开始掉血：第 3~5 天每天 -0.05，
+    第 6 天起每天 -0.1。
     """
     pop = state["populations"]
     hit_arr, miss_arr, absent_arr = SETTLER_HUNT_TEXT.get(
@@ -2342,6 +2395,9 @@ def _settler_hunt(state, s, hunter, events, r):
             s["since_hunt"] = s.get("since_hunt", 0) + 1
         else:
             succ_p = 0.4 if prey_total >= 5 else 0.2
+            # 冬季鱼活动迟缓更难捕捉：翠鸟成功率额外压到 15%（item 11）
+            if state["season"] == "冬" and s["name"] == "翠鸟":
+                succ_p = min(succ_p, 0.15)
             if r.chance(succ_p):
                 for p in prey_list:
                     if pop.get(p, 0) >= 1:
@@ -2353,8 +2409,12 @@ def _settler_hunt(state, s, hunter, events, r):
             else:
                 _hunt_emit(state, s, events, r, miss_arr, "miss")
                 s["since_hunt"] = s.get("since_hunt", 0) + 1
-    # 连续 5 天没有成功捕食才开始每天 -0.05
-    if s.get("since_hunt", 0) >= 5:
+    # 连续 3 天没成功捕食才开始掉血：第 3~5 天每天 -0.05，第 6 天起每天 -0.1。
+    # 约 10~14 天彻底没食物就会饿到离开（item: 翠鸟健康下降加速）。
+    sh = s.get("since_hunt", 0)
+    if sh >= 6:
+        s["health"] = round(s["health"] - 0.1, 3)
+    elif sh >= 3:
         s["health"] = round(s["health"] - 0.05, 3)
 
 
@@ -2393,10 +2453,10 @@ def _settler_warn_chronicle(state, s):
     lvl = s.get("warn_level", 0)
     if h < 0.3 and lvl < 2:
         s["warn_level"] = 2
-        _chronicle(state, SETTLER_WARN_CHRON_HEAVY % name)
+        _chronicle(state, SETTLER_WARN_CHRON_HEAVY % name, key=False)
     elif 0.3 <= h < 0.5 and lvl < 1:
         s["warn_level"] = 1
-        _chronicle(state, SETTLER_WARN_CHRON_LIGHT % name)
+        _chronicle(state, SETTLER_WARN_CHRON_LIGHT % name, key=False)
     elif h >= 0.5 and lvl != 0:
         s["warn_level"] = 0
 
@@ -2410,6 +2470,24 @@ def _process_settlers(state, events, r):
         s["age"] += 1
         name = s["name"]
         cfg = SETTLER_TYPES.get(name, {})
+        # 变温动物冬眠：流浪乌龟冬季缩进淤泥，不摄食 / 不掉血 / 不离开，春季苏醒（item 7）
+        if season == "冬" and name == "流浪乌龟":
+            if not s.get("hibernating"):
+                s["hibernating"] = True
+                events.append("settler:乌龟缩进壳里，慢慢沉到水底的淤泥中。"
+                              "它不吃也不动，把整个冬天睡了过去。")
+                _chronicle(state, "乌龟潜入水底淤泥，开始冬眠。")
+            rec = state["folio"]["settlers"].setdefault(name, {"times": 0, "max_days": 0})
+            if s["age"] > rec.get("max_days", 0):
+                rec["max_days"] = s["age"]
+            survivors.append(s)
+            continue
+        # 冬眠结束：非冬季时苏醒（变温动物随水温回升重新活动）
+        if s.get("hibernating") and season != "冬":
+            s["hibernating"] = False
+            events.append("settler:乌龟从淤泥里探出头来，壳上还沾着泥。"
+                          "它慢吞吞爬向有阳光的浅水，冬眠结束了。")
+            _chronicle(state, "乌龟结束冬眠，重新回到池塘。")
         # 幼体成长：到期转为独立定居者
         if s.get("juvenile"):
             s["juvenile_left"] = s.get("juvenile_left", cfg.get("juvenile_days", 0)) - 1
@@ -2456,6 +2534,11 @@ def _process_settlers(state, events, r):
         if leave:
             events.append("settler_leave:" + leave)
             _chronicle(state, leave_chron)
+            # 个体分开计数：定居者离开/死亡后，对应访客来访次数清零，
+            # 下一只同种访客从第 1 次重新累计（item 1）
+            v = state["folio"]["visitors"].get(name)
+            if v:
+                v["count"] = 0
         else:
             survivors.append(s)
     # 繁殖：同种 >= 2，春夏季每天 5% 概率，未达上限则添一只幼体
@@ -2512,12 +2595,32 @@ def _choice_ready(state, key):
     return True
 
 
-def _trigger_choice(state, events, key):
-    """触发一个决策事件：设置 pending_choice，本回合不再生成其他随机事件。"""
+_CN_DIGITS = "零一二三四五六七八九"
+
+
+def _cn_num(n):
+    """把 1~99 的整数转成中文数字（用于"第N次"叙事），超出范围回退为阿拉伯数字。"""
+    n = int(n)
+    if n < 0 or n > 99:
+        return str(n)
+    if n < 10:
+        return _CN_DIGITS[n]
+    tens, ones = divmod(n, 10)
+    s = ("" if tens == 1 else _CN_DIGITS[tens]) + "十"
+    if ones:
+        s += _CN_DIGITS[ones]
+    return s
+
+
+def _trigger_choice(state, events, key, desc_override=None):
+    """触发一个决策事件：设置 pending_choice，本回合不再生成其他随机事件。
+
+    desc_override：调用方传入的动态描述（如翠鸟"第N次"按真实来访次数生成）。
+    """
     spec = CHOICE_EVENTS[key]
     # 动态描述：只提及当前真实在场的目标，避免"盯上不存在的猎物"
-    desc = spec["desc"]
-    if spec.get("desc_tmpl") and spec.get("requires"):
+    desc = desc_override or spec["desc"]
+    if desc_override is None and spec.get("desc_tmpl") and spec.get("requires"):
         present = [n for n in spec["requires"] if state["populations"].get(n, 0) >= 1]
         if present:
             desc = spec["desc_tmpl"] % "和".join(present)
@@ -2667,8 +2770,17 @@ def _resolve_choice(state, pc, idx, events):
 
     # 访客志 / 事件志登记
     book = "events" if key in ("暴雨", "干旱", "热浪", "洪水", "水华") else "visitors"
-    _folio_bump(state, book, key, note="你选择「%s」" % chosen)
-    _chronicle(state, "%s —— 你选择「%s」" % (title, chosen))
+    folio_key, record_title = key, title
+    # 定居类决策选择"不留下"时，记录为"离开"而非"定居"（item 4）
+    if key in ("翠鸟定居", "苍鹭定居") and idx != 1:
+        species = key[:-2]          # 去掉末尾"定居" -> 翠鸟 / 苍鹭
+        folio_key = record_title = species + "离开"
+        # 个体分开计数：这一只飞走后来访次数清零，下一只从第 1 次重新累计（item 1）
+        v = state["folio"]["visitors"].get(species)
+        if v:
+            v["count"] = 0
+    _folio_bump(state, book, folio_key, note="你选择「%s」" % chosen)
+    _chronicle(state, "%s —— 你选择「%s」" % (record_title, chosen))
     # 跨类型全局冷却：任意决策结算后开始计时
     state.setdefault("choice_cooldowns", {})["__any__"] = state["turn"]
     return msg
@@ -2719,12 +2831,15 @@ def _random_events(state, events, r, season):
         if vis(0.15) and can_choose() and _choice_ready(state, "螃蟹"):
             _trigger_choice(state, events, "螃蟹")
 
-    # 常见 ~15%（无需决策）
+    # 常见访客 ~8%/天（无需决策）
     # 翠鸟：累计来访 5 次后，下一次变为"定居"决策
-    if not _has_settler(state, "翠鸟") and vis(0.05):
+    if not _has_settler(state, "翠鸟") and vis(0.08):
         loss = r.randint(1, 3)  # 始终消耗，维持随机流对齐
         if vcount("翠鸟") >= 5 and can_choose() and _choice_ready(state, "翠鸟定居"):
-            _trigger_choice(state, events, "翠鸟定居")
+            # 文案动态化：用真实来访次数，而非硬编码"第五次"（item 1）
+            desc = ("这是翠鸟第%s次停在那根枯枝上了。今天它没有急着俯冲，"
+                    "而是歪着头，打量着枝杈间的位置。" % _cn_num(vcount("翠鸟")))
+            _trigger_choice(state, events, "翠鸟定居", desc_override=desc)
         elif pop.get("鲫鱼", 0) >= 1:
             pop["鲫鱼"] = max(0.0, pop["鲫鱼"] - loss)
             events.append("visitor:一道翠蓝色的影子俯冲而下，水面溅起碎光。%d 条鲫鱼不见了。" % loss)
@@ -2733,14 +2848,15 @@ def _random_events(state, events, r, season):
             # 池塘里没有鱼 —— 翠鸟扑空（专属文案，校验存在性）
             events.append("visitor:" + _pick_t(state, VISITOR_MISS["翠鸟"]))
             _folio_bump(state, "visitors", "翠鸟", "扑空，水里无鱼")
-    # 蝙蝠：萤火虫大爆发次日出现概率 ×3
-    bat_p = 0.15 if _chain_active(state, "bat_x3") else 0.05
+    # 蝙蝠：常见 ~8%/天；萤火虫大爆发次日出现概率 ×3
+    bat_p = 0.24 if _chain_active(state, "bat_x3") else 0.08
     if vis(bat_p):
         pop["蚊子"] *= 0.9          # 蚊子 -10%（item 七）
         pop["蜻蜓成虫"] *= 0.95
         events.append("visitor:暮色里，翅膀划过水面，蚊蚋与蜻蜓的振翅声静了下来。")
         _folio_bump(state, "visitors", "蝙蝠群", "夜捕飞虫（蚊子-10%）")
-    if vis(0.05):
+    # 流浪猫：常见 ~8%/天
+    if vis(0.08):
         if r.chance(0.3):
             if r.chance(0.5) and pop["鲫鱼"] >= 1:
                 pop["鲫鱼"] -= 1
@@ -2755,25 +2871,25 @@ def _random_events(state, events, r, season):
             events.append("visitor:猫蹲了很久，爪子空落落地收回，转身走掉了。")
         _folio_bump(state, "visitors", "流浪猫", "觊觎鱼和田鼠")
 
-    # 少见 ~5%
+    # 少见访客 ~3%/天
     snake_ok = season != "冬"
-    if snake_ok and vis(0.02):  # 蛇 —— 决策
+    if snake_ok and vis(0.03):  # 蛇 —— 决策
         r.randint(1, 2)  # 维持随机流对齐（原立即效果在此消耗一次抽样）
         if can_choose() and _choice_ready(state, "蛇"):
             _trigger_choice(state, events, "蛇")
-    if vis(0.02):
+    if vis(0.03):
         # 刺猬：明确捕食水黾 -2~3（item 七）
         if pop.get("水黾", 0) >= 1:
             pop["水黾"] = max(0.0, pop["水黾"] - r.randint(2, 3))
         events.append("visitor:夜色里，一团刺球窸窸窣窣翻着落叶，找水边的小虫。")
         _folio_bump(state, "visitors", "刺猬", "捕食水黾")
-    if vis(0.02):
+    if vis(0.03):
         pop["田鼠"] = max(0.0, pop["田鼠"] - r.randint(1, 2))
         events.append("visitor:一道细长的影子追着田鼠窜过，芦苇剧烈摇晃。")
         _folio_bump(state, "visitors", "黄鼠狼", "捕食田鼠")
 
-    # 稀有 ~1%
-    deer_p = 0.02 if season == "秋" else 0.005
+    # 稀有访客 ~0.5%/天（秋季鹿略多）
+    deer_p = 0.01 if season == "秋" else 0.005
     if vis(deer_p):
         env["turbidity"] = _clamp(env["turbidity"] + 0.4, 0, 1)
         pop["浮萍"] *= 0.8
@@ -2783,21 +2899,24 @@ def _random_events(state, events, r, season):
     if not _has_settler(state, "苍鹭") and vis(0.005):
         r.randint(3, 5)  # 维持随机流对齐
         if vcount("苍鹭") >= 3 and can_choose() and _choice_ready(state, "苍鹭定居"):
-            _trigger_choice(state, events, "苍鹭定居")
+            # 文案动态化：用真实来访次数（item 1，与翠鸟同理）
+            desc = ("苍鹭第%s次来的时候没有捕鱼。它衔着一根枯枝，放在岸边的高草丛里。"
+                    "然后它又衔来第二根。" % _cn_num(vcount("苍鹭")))
+            _trigger_choice(state, events, "苍鹭定居", desc_override=desc)
         elif can_choose() and _choice_ready(state, "苍鹭"):
             _trigger_choice(state, events, "苍鹭")
     if vis(0.005) and not has_turtle and can_choose() and _choice_ready(state, "流浪乌龟"):
         _trigger_choice(state, events, "流浪乌龟")  # 流浪乌龟 —— 决策（同时只会有一只）
 
-    # 传说级 ~0.2%
-    if vis(0.002):
+    # 传说级访客 ~0.05%/天
+    if vis(0.0005):
         events.append("legend:满月之夜，无数萤火从草丛升起，水面落满流动的光。")
         _folio_bump(state, "events", "萤火虫大爆发", "纯观赏奇景")
         _chain_set(state, "bat_x3", 1)  # 连锁：次日蝙蝠出现概率 ×3
         _unlock(state, events, "萤光之夜")
-    if vis(0.002) and can_choose() and _choice_ready(state, "水獭"):  # 水獭 —— 决策
+    if vis(0.0005) and can_choose() and _choice_ready(state, "水獭"):  # 水獭 —— 决策
         _trigger_choice(state, events, "水獭")
-    duck_p = 0.004 if season in ("春", "秋") else 0.0005
+    duck_p = 0.001 if season in ("春", "秋") else 0.0005
     if vis(duck_p):
         state["flags"]["duck_visits"] = state["flags"].get("duck_visits", 0) + 1
         if state["flags"]["duck_visits"] >= 3 and not _has_settler(state, "野鸭") \
@@ -2831,10 +2950,11 @@ def _random_events(state, events, r, season):
         _folio_bump(state, "events", "寒潮", "结冰阻断光照与气体交换")
 
     # ---- V1.0 扩展：新增访客与环境事件 ----
-    # 池鹭（常见 ~10%，春夏秋；捕泥鳅）
-    if season != "冬" and vis(0.10):
+    # 池鹭（常见 ~8%，春夏秋；捕泥鳅）
+    if season != "冬" and vis(0.08):
+        bite = r.randint(1, 2)  # 始终消耗，维持随机流对齐（与翠鸟同一写法）
         if pop.get("泥鳅", 0) >= 1:
-            pop["泥鳅"] = max(0.0, pop["泥鳅"] - r.randint(1, 2))
+            pop["泥鳅"] = max(0.0, pop["泥鳅"] - bite)
             events.append("visitor:一只池鹭踩着浮萍边缘，低头盯住水下。长喙一刺，一条泥鳅被叼了起来。")
             _folio_bump(state, "visitors", "池鹭", "捕食泥鳅")
         else:
@@ -2846,11 +2966,11 @@ def _random_events(state, events, r, season):
         pop["蚊子"] *= 0.9
         events.append("visitor:几只燕子贴着水面掠过去，速度快得像几道黑线。蚊子少了一片。")
         _folio_bump(state, "visitors", "燕子", "捕食蚊子")
-    # 白鹭（少见 ~4%，春夏秋；需决策，需泥鳅或河蚌在场）
-    if season != "冬" and vis(0.04) and can_choose() and _choice_ready(state, "白鹭"):
+    # 白鹭（少见 ~3%，春夏秋；需决策，需泥鳅或河蚌在场）
+    if season != "冬" and vis(0.03) and can_choose() and _choice_ready(state, "白鹭"):
         _trigger_choice(state, events, "白鹭")
-    # 仙鹤（传说级 ~0.1%，冬春；纯观赏，解锁成就）
-    if season in ("冬", "春") and vis(0.001):
+    # 仙鹤（传说级 ~0.05%，冬春；纯观赏，解锁成就）
+    if season in ("冬", "春") and vis(0.0005):
         events.append("legend:薄雾中，一只仙鹤立在水边，长颈微曲，一动不动。"
                       "水面映着它的倒影，像一幅不真实的水墨。片刻后，它展开翅，慢慢消失在雾里。")
         _folio_bump(state, "visitors", "仙鹤", "纯观赏奇景")
@@ -2861,9 +2981,14 @@ def _random_events(state, events, r, season):
         events.append("weather:大雾笼罩了池塘。水面不见了，芦苇不见了，一切都化进灰白的模糊里。"
                       "光线穿过浓雾，只剩下朦胧的暗影。")
         _folio_bump(state, "events", "大雾", "光照骤降两三天")
-    # 洪水（稀有 ~0.8%，仅夏；需决策；已有进行中灾害时不叠加）
-    if no_weather and season == "夏" and vis(0.008) and can_choose() and _choice_ready(state, "洪水"):
-        _trigger_choice(state, events, "洪水")
+    # 洪水（稀有 ~0.8%，仅夏）：直接发生的持续灾害（2-3 天），不弹天气选项；
+    # 只有冲入螃蟹时才弹收留/放走的动物决策（item E2）。已有进行中灾害时不叠加。
+    if no_weather and season == "夏" and vis(0.008):
+        _start_weather(state, "洪水", False)
+        pop["河蚌"] *= 0.7  # 洪水冲击：河蚌 -30%
+        events.append("disaster:" + CHOICE_EVENTS["洪水"]["desc"])
+        _folio_bump(state, "events", "洪水", "上游来水，持续 2-3 天")
+        _chain_set(state, "crab_incoming", 3)  # 洪水期间可能触发螃蟹定居决策
     # 水华（自动触发）：热浪窗口 + (营养盐>60 或 碎屑>50) + 水面覆盖>0.6
     bloom_ok = (_chain_active(state, "heatwave")
                 and (env["nutrients"] > 60 or env["detritus"] > 50)
@@ -2871,6 +2996,18 @@ def _random_events(state, events, r, season):
     bloom_p = 0.3 * (2 if _chain_active(state, "waterbloom_x2") else 1)
     if bloom_ok and vis(bloom_p) and can_choose() and _choice_ready(state, "水华"):
         _trigger_choice(state, events, "水华")
+
+
+# 季节性自然归零：这些物种在对应季节归零属正常季节更替，只在 wait 摘要里体现，
+# 不触发"⚠️ 自动暂停"。value 为 None 表示任何季节归零都算自然（蜕变型本就会清零），
+# value 为季节字符串表示仅该季节归零才算自然，其它季节归零仍按异常处理（item 10）。
+SEASONAL_ZERO = {
+    "蝌蚪": None,   # 蜕变为青蛙 / 冬季高死亡
+    "孑孓": None,   # 蜕变为蚊子
+    "睡莲": "冬",   # 冬枯（来年春天从根茎恢复）
+    "浮萍": "冬",   # 冬季高死亡
+    "水黾": "冬",   # 越冬消失
+}
 
 
 def _detect_pause(state, events):
@@ -2886,7 +3023,11 @@ def _detect_pause(state, events):
     for name in RESIDENT_SPECIES:
         if name in state["seen"] and not _is_present(state, name):
             if name not in alerted:
-                reasons.append("%s 数量归零" % name)
+                # 季节性自然归零（睡莲冬枯 / 孑孓蝌蚪蜕变 / 昆虫越冬）不强暂停（item 10）
+                seasonal = name in SEASONAL_ZERO and (
+                    SEASONAL_ZERO[name] is None or SEASONAL_ZERO[name] == state["season"])
+                if not seasonal:
+                    reasons.append("%s 数量归零" % name)
                 alerted.append(name)
         elif name in alerted and _is_present(state, name):
             # 已恢复：清除标记，下次归零会重新提醒
@@ -3014,11 +3155,78 @@ def _health_word(h):
     return "危急"
 
 
+def _pond_score(state):
+    """池塘综合评分（0~100）+ 定性描述。六个维度按权重加权（item F1）。"""
+    pop = state["populations"]
+    env = state["env"]
+    alive = [n for n in RESIDENT_SPECIES if pop.get(n, 0) >= 1]
+    S = len(alive)
+
+    # 1) 物种多样性 20%：存活物种数 / 20 × 100
+    diversity = min(100.0, S / 20.0 * 100.0)
+
+    # 2) 种群均衡度 15%：Shannon 均匀度（一家独大→低分，越均匀→高分）
+    counts = [pop[n] for n in alive if pop[n] > 0]
+    if len(counts) >= 2:
+        tot = sum(counts)
+        ps = [c / tot for c in counts]
+        H = -sum(p * math.log(p) for p in ps)
+        balance = _clamp(H / math.log(len(counts)), 0.0, 1.0) * 100.0
+    else:
+        balance = 0.0
+
+    # 3) 食物链完整度 20%：每有一个营养级在场得 25 分
+    trophs = set(SPECIES[n]["trophic"] for n in alive)
+    chain = 25.0 * sum(1 for t in ("producer", "primary", "secondary", "apex") if t in trophs)
+
+    # 4) 环境健康 15%：溶氧 / 浑浊度 / 营养盐三项取均值
+    def _band(v, lo, hi, span):
+        if lo <= v <= hi:
+            return 100.0
+        d = (lo - v) if v < lo else (v - hi)
+        return max(0.0, 100.0 - d / span * 100.0)
+    do_s = _band(env["dissolved_oxygen"], 5.0, 10.0, 5.0)
+    turb_s = _band(env["turbidity"], 0.0, 0.2, 0.4)
+    nut_s = _band(env["nutrients"], 10.0, 50.0, 40.0)
+    env_health = (do_s + turb_s + nut_s) / 3.0
+
+    # 5) 定居者 10%：1 个健康定居者得 50 分，2 个以上满分
+    healthy = sum(1 for s in state.get("settlers", []) if s["health"] > 0.5)
+    settler_s = 100.0 if healthy >= 2 else (50.0 if healthy == 1 else 0.0)
+
+    # 6) 持续天数 20%：第30天15分 / 第120天50分 / 第360天满分，线性插值
+    d = state["turn"]
+    if d <= 30:
+        dur = d / 30.0 * 15.0
+    elif d <= 120:
+        dur = 15.0 + (d - 30) / 90.0 * 35.0
+    elif d <= 360:
+        dur = 50.0 + (d - 120) / 240.0 * 50.0
+    else:
+        dur = 100.0
+
+    total = (diversity * 0.20 + balance * 0.15 + chain * 0.20
+             + env_health * 0.15 + settler_s * 0.10 + dur * 0.20)
+    score = int(round(_clamp(total, 0.0, 100.0)))
+    if score >= 90:
+        word = "欣欣向荣"
+    elif score >= 70:
+        word = "基本稳定"
+    elif score >= 50:
+        word = "有些脆弱"
+    elif score >= 30:
+        word = "正在挣扎"
+    else:
+        word = "快要死了"
+    return score, word
+
+
 def _status_bar(state):
     """末尾 JSON 状态栏。"""
     pop = state["populations"]
     env = state["env"]
     pc = state.get("pending_choice")
+    score, _word = _pond_score(state)
     bar = {
         "day": state["turn"],
         "turn": state["turn"],
@@ -3029,6 +3237,7 @@ def _status_bar(state):
         "nutrients": round(env["nutrients"], 0),
         "detritus": round(env["detritus"], 0),
         "turbidity": round(env["turbidity"], 2),
+        "pond_score": score,
         # 只含已解锁且种群 >= 1 的物种；未解锁或归零（<1）的不出现在 JSON 里（item 1/8）
         "pop": {n: int(round(pop[n])) for n in RESIDENT_SPECIES
                 if n in _unlocked_set(state) and pop[n] >= 1},
@@ -3321,6 +3530,10 @@ def _observe_text(state, events):
         lines.append("· 当前：" + " / ".join(notable))
     if state.get("pending_choice"):
         lines.append(_choice_prompt(state["pending_choice"]))
+    # 每 30 天合并提醒：天数 + 成就进度 + 存档提示（item G2，不剧透具体成就）
+    if state["turn"] > 0 and state["turn"] % 30 == 0:
+        lines.append("· 造物主已走过 %d 天，解锁 %d/%d 个成就。输入 export 可保存进度。"
+                     % (state["turn"], len(state["achievements"]), len(ACHIEVEMENTS)))
     lines.append(_status_bar(state))
     return "\n".join(lines)
 
@@ -3604,10 +3817,19 @@ def _cmd_summon(state, args):
         ms[name] = new_pop
     _mark_intervention(state, True)
     _unlock(state, [], "初生之池")
+    # 大量投放的生态冲击（item D5）：单次 > 50 个体，溶氧即时下降（每 10 个体 -0.1）、浑浊 +0.05
+    shock = None
+    if qty > 50:
+        env = state["env"]
+        env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - 0.1 * (qty // 10))
+        env["turbidity"] = _clamp(env["turbidity"] + 0.05, 0.0, 1.0)
+        shock = "大量生灵涌入池塘，水面一阵骚动，水底的溶氧被搅得跌了一截。"
     # 立即检查是否因这次投放解锁了新物种
     disc = []
     _check_discovery(state, disc)
     lines = ["✋ 你向池塘投放了 %d 个「%s」（%s）。" % (qty, name, SPECIES[name]["space"])]
+    if shock:
+        lines.append(shock)
     lines.extend(_render_events(disc))
     return "\n".join(lines)
 
@@ -3627,37 +3849,72 @@ def _cmd_remove(state, args):
     if name is None or name not in state["populations"]:
         return "池塘里没有「%s」。" % args[0]
     cur = state["populations"][name]
+    shown = _ipop(state, name)          # 玩家在面板上看到的整数量
+    if shown <= 0:
+        return "池塘里没有「%s」。" % args[0]
+    # 按整数量执行并显示，避免"想移除 2 个却显示移除 1 个"（item 9）
     if len(args) >= 2 and args[1].lstrip("-").isdigit():
-        qty = min(cur, int(args[1]))
+        qty = min(shown, max(0, int(args[1])))
     else:
-        qty = cur
-    state["populations"][name] = max(0.0, cur - qty)
+        qty = shown
+    if qty <= 0:
+        return "移除数量必须大于零。"
+    # 扣满显示量即清零；否则从当前种群里扣掉整数 qty
+    state["populations"][name] = 0.0 if qty >= shown else max(0.0, cur - qty)
     _mark_intervention(state, True)
-    return "🗑 你从池塘移除了 %d 个「%s」（不可逆）。" % (int(qty), name)
+    return "🗑 你从池塘移除了 %d 个「%s」（不可逆）。" % (qty, name)
 
 
 def _cmd_feed(state, args):
-    state["env"]["nutrients"] += 15
-    # 未吃完的饲料 → 有机碎屑
-    state["env"]["detritus"] += 25
-    # 水蚤、孑孓等小幅获益
+    env = state["env"]
+    # feed [数量]，默认 1（item E1）
+    qty = 1
+    if args and args[0].lstrip("-").isdigit():
+        qty = max(1, int(args[0]))
+    # 累积效应：碎屑越多，未吃完的饲料越容易堆积恶化（item D3）
+    det = env["detritus"]
+    mult = 3.0 if det > 80 else (2.0 if det > 40 else 1.0)
+    env["nutrients"] += 15 * qty
+    env["detritus"] += 25 * qty * mult        # 碎屑增量按数量与累积倍率叠加
     state["populations"]["水蚤"] *= 1.05
     _mark_intervention(state, True)
-    return "🍚 你向池塘投喂了饲料。鱼儿争食，未吃完的沉入水底，慢慢腐解，水底多了一层沉淀。"
+    lines = ["🍚 你向池塘投喂了 %d 份饲料。鱼儿争食，未吃完的沉入水底，慢慢腐解，水底多了一层沉淀。" % qty]
+    if det > 80:
+        # 碎屑 > 80：触发水质恶化描写
+        lines.append("水已经发浑发腥了，沉底的腐泥一层压着一层——再这么喂下去，水迟早会臭。")
+    elif det > 40:
+        lines.append("水色比先前浊了些，喂下去的料有不少没被吃掉，正一点点沤在水底。")
+    return "\n".join(lines)
 
 
 def _cmd_clean(state, args):
     pop = state["populations"]
+    # 记录清理前数量，便于在文案里写出具体代价（item D6）
+    daphnia_before = _ipop(state, "水蚤")
+    larva_before = _ipop(state, "孑孓")
     pop["水藻"] *= 0.4
-    # 副作用：带走水蚤和微生物
+    # 副作用：带走水蚤、孑孓和微生物
     pop["水蚤"] *= 0.5
+    pop["孑孓"] *= 0.5
     pop["细菌"] *= 0.5
     state["env"]["detritus"] *= 0.7
+    # 换水带走部分营养盐（item 8：营养盐不再只涨不降）
+    state["env"]["nutrients"] *= 0.7
     state["env"]["turbidity"] = _clamp(state["env"]["turbidity"] - 0.2, 0, 1)
     # 换水降低疫病传播概率（持续 3 天）
     _chain_set(state, "sanitized", 3)
     _mark_intervention(state, True)
-    return "🧹 你捞走水藻，换了水。池水清澈起来，但许多微小的生命也随之流走了。"
+    lines = ["🧹 你捞走水藻，换了水。池水清澈起来，但许多微小的生命也随之流走了。"]
+    losses = []
+    d_lost = daphnia_before - _ipop(state, "水蚤")
+    l_lost = larva_before - _ipop(state, "孑孓")
+    if d_lost > 0:
+        losses.append("约 %d 只水蚤" % d_lost)
+    if l_lost > 0:
+        losses.append("约 %d 只孑孓" % l_lost)
+    if losses:
+        lines.append("清理带走了" + "和".join(losses) + "。")
+    return "\n".join(lines)
 
 
 def _cmd_status(state):
@@ -3687,6 +3944,8 @@ def _cmd_status(state):
         lines.append("─ 天气 ─")
         lines.append("  ⛅ %s进行中（第 %d/%d 天）" % (aw["kind"], aw["elapsed"], aw["duration"]))
     lines.append("已解锁成就：%d/%d" % (len(state["achievements"]), len(ACHIEVEMENTS)))
+    score, word = _pond_score(state)
+    lines.append("🌡 池塘评分：%d/100（%s）" % (score, word))
     lines.append(_status_bar(state))
     return "\n".join(lines)
 
@@ -3926,6 +4185,8 @@ def _lite_snapshot(state):
         "pending_choice": state.get("pending_choice"),
         "pending_wait_days": state.get("pending_wait_days", 0),
         "choice_cooldowns": state.get("choice_cooldowns", {}),
+        # 关键事件年鉴：保留解锁/归零/定居者来去/灾害/决策/季节，砍掉日常记录（item G1）
+        "chronicle": state.get("key_chronicle", [])[-120:],
         # folio 摘要：每本志压缩为最小键值，不含逐条 notes
         "folio": {
             "species": {n: [e.get("first_day"), e.get("extinct_count", 0)]
@@ -3976,7 +4237,9 @@ def _restore_from_lite(data):
                                  for n, c in fs.get("visitors", {}).items()}
     base["folio"]["events"] = {n: {"count": c, "notes": []}
                                for n, c in fs.get("events", {}).items()}
-    base["chronicle"] = []   # lite 加载后年鉴为空
+    # lite 保留关键事件年鉴（item G1）
+    base["chronicle"] = list(data.get("chronicle", []))
+    base["key_chronicle"] = list(data.get("chronicle", []))
     return base
 
 
@@ -3987,7 +4250,7 @@ def _cmd_export(state, args):
     raw = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     b64 = base64.b64encode(raw.encode("utf-8")).decode("ascii")
     label = "精简存档" if lite else "完整存档"
-    tip = "（精简版：仅核心状态，年鉴不含其中）" if lite else "（完整版：含全部年鉴历史）"
+    tip = "（精简版：核心状态 + 关键事件年鉴）" if lite else "（完整版：含全部年鉴历史）"
     return "📦 %s%s，复制下面整段即可保存/迁移：\n%s" % (label, tip, b64)
 
 
@@ -4006,15 +4269,13 @@ def _cmd_import(state, args):
     is_lite = bool(data.get("lite"))
     restored = _restore_from_lite(data) if is_lite else data
     _migrate(restored)
-    if is_lite:
-        restored["chronicle"] = []
     # 原地替换当前 state，使 cmd() 末尾的保存写入恢复后的内容
     state.clear()
     state.update(restored)
     kind = "精简存档" if is_lite else "完整存档"
     return "📥 已从%s恢复：第 %d 天 · %s。%s" % (
         kind, state["turn"], state["season"],
-        "（精简存档不含年鉴历史，已重置为空）" if is_lite else "")
+        "（精简存档仅保留关键事件年鉴）" if is_lite else "")
 
 
 def _help_text():
@@ -4025,8 +4286,8 @@ def _help_text():
         "  gaze             凝望此刻的池塘，看一段微观景象。（不推进时间）\n"
         "  summon 物种 数量 向池塘投放生灵。（不拘物种，后果自负）\n"
         "  remove 物种 数量 从池塘中取走生物。（不可逆）\n"
-        "  feed             撒下饲料，滋养万物。（残饵沉底腐烂，令碎屑增加）\n"
-        "  clean            清理水藻与浊水，池水变清，但会带走微小生命。\n"
+        "  feed [数量]      撒下饲料（默认 1 份），滋养万物。（残饵沉底腐烂，碎屑越多越快恶化）\n"
+        "  clean            清理水藻与浊水，池水变清，但会带走水蚤、孑孓等微小生命。\n"
         "  choose 选项      对眼前的事做出选择。（choose 1 / choose 收留 均可）\n"
         "  status           详细数据面板。\n"
         "  folio            万物志（物种/定居者/访客/事件）。\n"
