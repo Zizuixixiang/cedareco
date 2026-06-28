@@ -262,6 +262,22 @@ SETTLER_TYPES = {
             "brood_food": {"鲫鱼": 1, "泥鳅": 1}, "juvenile_days": 25, "max_count": 3},
 }
 
+# 定居者延迟因果暗示：定居满 N 天时，在某次 observe 末尾追加一句一次性描写。
+# SETTLER_HINT_DAYS：触发天数（定居者 age 达到该值且未触发过时出现）。
+SETTLER_HINT_DAYS = {
+    "翠鸟": 7, "苍鹭": 7, "水蛇": 10, "流浪乌龟": 10, "野鸭": 7, "螃蟹": 10,
+}
+# SETTLER_HINTS：暗示文案（DeepSeek 文案，待补；先留空占位）。key 为定居者名。
+# 文案为空时不追加、也不消耗触发标记，待真正填入后仍会在下次满足条件时出现。
+SETTLER_HINTS = {
+    "翠鸟": "",
+    "苍鹭": "",
+    "水蛇": "",
+    "流浪乌龟": "",
+    "野鸭": "",
+    "螃蟹": "",
+}
+
 # 定居者叙事文案（到来 / 饥饿离开 / 年迈离开 + 各自的年鉴记录）
 SETTLER_TEXT = {
     "流浪乌龟": {
@@ -3601,8 +3617,30 @@ def _observe_text(state, events):
     if state["turn"] > 0 and state["turn"] % 30 == 0:
         lines.append("· 造物主已走过 %d 天，解锁 %d/%d 个成就。输入 export 可保存进度。"
                      % (state["turn"], len(state["achievements"]), len(ACHIEVEMENTS)))
+    # 定居者延迟因果暗示（定居满 N 天的一次性描写）
+    lines.extend(_settler_hint_lines(state))
     lines.append(_status_bar(state))
     return "\n".join(lines)
+
+
+def _settler_hint_lines(state):
+    """定居者定居满触发天数时，追加一句一次性暗示文案（按 flags 去重，只出现一次）。"""
+    flags = state["flags"]
+    out = []
+    for s in state.get("settlers", []):
+        name = s["name"]
+        day = SETTLER_HINT_DAYS.get(name)
+        if day is None or s["age"] < day:
+            continue
+        flag = "settler_hint_%s" % name
+        if flags.get(flag):
+            continue
+        hint = SETTLER_HINTS.get(name)
+        if not hint:          # 占位为空：不追加，也不标记，待文案填入后仍可触发
+            continue
+        out.append("· " + hint)
+        flags[flag] = True
+    return out
 
 
 # ---------------------------------------------------------------------------
