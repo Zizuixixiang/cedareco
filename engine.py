@@ -201,7 +201,7 @@ SPECIES = {
         "food_sources": ["芦苇"], "predation": 0.0008, "init": 5,
     },
     "细菌": {
-        "space": "水底", "trophic": "decomposer",
+        "space": "水底", "trophic": "decomposer", "hidden": True,
         "birth_rate": 0.50, "death_rate": 0.20, "max_capacity": 2000,
         "food_sources": [], "predation": 0.0, "init": 100,
     },
@@ -505,7 +505,7 @@ SETTLER_WARN_CHRON_HEAVY = "%s 濒临饿死，命悬一线。"
 # ---------------------------------------------------------------------------
 # 2c. 决策事件（choose 机制）
 # ---------------------------------------------------------------------------
-# 触发时设置 pending_choice，等待玩家 choose。default 为连续 3 天不选时的默认项（1-based）。
+# 触发时设置 pending_choice，一直等待玩家 choose（不会自动结算）。
 # 实际效果在 _resolve_choice 中按 key 分支处理。
 
 # requires：触发前提（列表中任一物种当前存在才触发；空表示无前提）。
@@ -516,49 +516,42 @@ CHOICE_EVENTS = {
         "desc_tmpl": "一条水蛇无声地切开水面，头探向草丛里的%s。",
         "requires": ["青蛙", "田鼠"],
         "choices": ["把它赶走", "不去干预", "保持距离观察"],
-        "default": 2,
         "title": "水蛇来访",
     },
     "苍鹭": {
         "desc": "一只苍鹭立在浅水里，脖颈弯成一道弓，长喙对准水面。",
         "requires": ["鲫鱼"],
         "choices": ["挥手吓走它", "让它捕食"],
-        "default": 2,
         "title": "苍鹭来访",
     },
     "流浪乌龟": {
         "desc": "池边多了一团暗影。龟壳覆着干泥，脖子慢慢伸出来，朝向水面。",
         "requires": [],
         "choices": ["收留它", "让它离开"],
-        "default": 2,
         "title": "流浪乌龟来访",
     },
     "水獭": {
         "desc": "一道油亮的影子滑入水中，水獭的眼睛在水面下闪动。",
         "requires": ["鲫鱼", "鲤鱼"],
         "choices": ["想办法留住它", "任其离开"],
-        "default": 2,
         "title": "水獭来访",
     },
     "暴雨": {
         "desc": "天暗下来，云层压得很低，空气里满是雨腥气。",
         "requires": [],
         "choices": ["提前加固堤岸", "顺其自然"],
-        "default": 2,
         "title": "暴雨",
     },
     "干旱": {
         "desc": "日光一天天晒着，水面缓慢退下，露出一圈干裂的泥岸。",
         "requires": [],
         "choices": ["引水补充", "静观其变"],
-        "default": 2,
         "title": "干旱",
     },
     "热浪": {
         "desc": "热空气压着池塘，水面不闪动了，水底在变闷。",
         "requires": [],
         "choices": ["为池塘遮荫降温", "硬扛过去"],
-        "default": 2,
         "title": "热浪",
     },
     # ---- V1.0 扩展：新增决策事件 ----
@@ -566,49 +559,42 @@ CHOICE_EVENTS = {
         "desc": "一只白鹭踏入浅水，长腿抬得很慢，目光扫过泥底。它在找泥鳅和河蚌。",
         "requires": ["泥鳅", "河蚌"],
         "choices": ["驱赶", "放任"],
-        "default": 2,
         "title": "白鹭来访",
     },
     "洪水": {
         "desc": "暴雨连下数日，上游的水翻涌而下。池塘正在被淹没，浑浊的洪水冲了进来。",
         "requires": [],
         "choices": ["加固堤岸", "开放引入"],
-        "default": 1,
         "title": "洪水",
     },
     "水华": {
         "desc": "水面被一层黏稠的绿藻封住了，光透不下去。水下闷得发慌，气泡从藻缝里艰难地冒出来。",
         "requires": [],
         "choices": ["紧急清理", "等待自然恢复"],
-        "default": 2,
         "title": "水华",
     },
     "螃蟹": {
         "desc": "一只螃蟹从浑水里横着爬了出来，挥着一对大钳子，站在岸边，像是在打量这个新世界。",
         "requires": [],
         "choices": ["收留它", "让它离开"],
-        "default": 2,
         "title": "螃蟹来访",
     },
     "野鸭": {
         "desc": "一对野鸭在池塘降落，绕着水面游了好几圈。它们没有飞走的意思，像是在找地方留下来。",
         "requires": [],
         "choices": ["欢迎留下", "让它们继续迁徙"],
-        "default": 2,
         "title": "野鸭定居",
     },
     "翠鸟定居": {
         "desc": "这是翠鸟第五次停在那根枯枝上了。今天它没有急着俯冲，而是歪着头，打量着枝杈间的位置。",
         "requires": [],
         "choices": ["让它留下筑巢", "让它自行决定"],
-        "default": 2,
         "title": "翠鸟定居",
     },
     "苍鹭定居": {
         "desc": "苍鹭第三次来的时候没有捕鱼。它衔着一根枯枝，放在岸边的高草丛里。然后它又衔来第二根。",
         "requires": [],
         "choices": ["欢迎它安家", "赶走它"],
-        "default": 2,
         "title": "苍鹭定居",
     },
 }
@@ -1006,55 +992,59 @@ GAZE_HIBERNATE = [
 # ---------------------------------------------------------------------------
 
 OBSERVE_AMBIENT = {
+    # 每条文案可标注依赖物种 (text, [物种...])：依赖物种不在场时该条被过滤掉
+    # （见 _pick_ambient）；无依赖的写成纯字符串。
     "high_cover": [
-        "浮萍铺满了水面。光从几处缝隙漏下去，在水底投下细碎的光斑，其余都是暗的。",
-        "绿毯把水面封死了。看不见鱼，看不见底，浮萍在微风里轻轻挤着，发出细小的摩擦声。",
-        "浮萍厚厚地压着，风也推不开。水底闷得发不出声，偶尔一串气泡从缝隙里钻上来，又碎了。",
-        "浮萍密到连水都看不见了。偶尔有鱼顶了一下浮萍，绿毯鼓起一个小包，又慢慢平下去。",
-        "绿色的覆盖从岸边一直铺到对岸，水面彻底消失了。只有风吹过时，浮萍的缝隙里才露出一线深色的水。",
+        ("浮萍铺满了水面。光从几处缝隙漏下去，在水底投下细碎的光斑，其余都是暗的。", ["浮萍"]),
+        ("绿毯把水面封死了。看不见鱼，看不见底，浮萍在微风里轻轻挤着，发出细小的摩擦声。", ["浮萍"]),
+        ("浮萍厚厚地压着，风也推不开。水底闷得发不出声，偶尔一串气泡从缝隙里钻上来，又碎了。", ["浮萍"]),
+        ("浮萍密到连水都看不见了。偶尔有鱼顶了一下浮萍，绿毯鼓起一个小包，又慢慢平下去。", ["浮萍"]),
+        ("绿色的覆盖从岸边一直铺到对岸，水面彻底消失了。只有风吹过时，浮萍的缝隙里才露出一线深色的水。", ["浮萍"]),
+        # 睡莲主导覆盖时的兜底描写（不点名浮萍）
+        "水面被一层圆叶封得严严实实，光只在叶隙间漏下零星几缕，水底沉在暗里。",
     ],
     "low_do": [
-        "水面上浮着一层细密的气泡，久久不散。几条鲫鱼把嘴探出来，急促地张合。",
-        "水底积着一口吐不出的浊气。水草软软地垂着，田螺缩进壳里，一动不动。",
-        "池塘闷住了。连水蚤都挤到了近水面，密密麻麻，在那一层薄薄的氧气里争着喘息。",
-        "水底暗沉沉的，连水藻都不怎么冒气泡了。鱼群浮在近水面，鳍划得很慢，像是在稠稠的液体里搅动。",
+        ("水面上浮着一层细密的气泡，久久不散。几条鲫鱼把嘴探出来，急促地张合。", ["鲫鱼"]),
+        ("水底积着一口吐不出的浊气。水草软软地垂着，田螺缩进壳里，一动不动。", ["田螺"]),
+        ("池塘闷住了。连水蚤都挤到了近水面，密密麻麻，在那一层薄薄的氧气里争着喘息。", ["水蚤"]),
+        ("水底暗沉沉的，连水藻都不怎么冒气泡了。鱼群浮在近水面，鳍划得很慢，像是在稠稠的液体里搅动。", ["水藻"]),
         "池塘的呼吸越来越浅。水面那一层气泡聚了又散，散了又聚，底下的生命在一点一点往上挤。",
     ],
     "high_nutrients": [
         "水色发绿，浓得有些黏稠。光只穿得进一半，水底的一切都模糊了轮廓。",
-        "水藻疯长，绿丝缠成一团一团，在水里轻轻拉扯，像在争抢最后的光。",
+        ("水藻疯长，绿丝缠成一团一团，在水里轻轻拉扯，像在争抢最后的光。", ["水藻"]),
         "池水绿得不正常，空气里浮着一股生腥气。水草上挂满了黏糊糊的绿絮，随波晃着。",
-        "水藻的绿浓得发暗，不再是翠的，而是一种沉甸甸的墨绿。它们在水中膨胀，挤占了所有能挤的空间。",
+        ("水藻的绿浓得发暗，不再是翠的，而是一种沉甸甸的墨绿。它们在水中膨胀，挤占了所有能挤的空间。", ["水藻"]),
         "水草上挂满了黏糊糊的绿絮，越长越长，随波晃荡。有几缕从茎上断开，慢慢漂向更浑的地方。",
     ],
     "high_detritus": [
         "水底积着一层厚厚的腐叶，踩上去会陷下去。腐气从淤泥里往上冒，在水面碎成细密的气泡。",
-        "池底黏糊糊的，碎屑堆成了团。水蚯蚓在底下蠕动，密密麻麻的红丝时隐时现。",
+        ("池底黏糊糊的，碎屑堆成了团。水蚯蚓在底下蠕动，密密麻麻的红丝时隐时现。", ["水蚯蚓"]),
         "水面漂着碎叶和半腐的草茎，水色发黄。稍一搅动，沉底的碎屑就翻上来，水更浑了。",
-        "池底积了厚厚一层腐叶，水蚯蚓在里面钻来钻去，把碎屑拱得不停翻动。泥面上密密麻麻全是它们扭动的红丝。",
+        ("池底积了厚厚一层腐叶，水蚯蚓在里面钻来钻去，把碎屑拱得不停翻动。泥面上密密麻麻全是它们扭动的红丝。", ["水蚯蚓"]),
         "水面不时冒出一串气泡，带着腐泥的味道。碎屑在水底慢慢分解，释放出看不见的东西。",
     ],
     "biodiverse": [
         "池塘从来没有这样挤过。从水底到水面，每一层都有生命在忙自己的事。",
-        "鱼群在水草间穿梭，田螺在石面上缓缓爬过，岸边草丛里窸窣作响。池塘活了。",
-        "眼睛不知道该往哪里放。水蚤在光柱里跳动，远处野鸭划开水面，到处都有动静。",
-        "水黾在水面压出一圈圈细纹，鲫鱼在中间水层穿梭，田螺在水底慢慢犁过石头。池塘的每一层都有人值班。",
-        "青蛙蹲在睡莲叶上叫了一声，蜻蜓从芦苇尖上弹出去，翠鸟在枯枝上偏了偏头。到处都有眼睛盯着水面，到处都有影子在被盯。",
-        "食物链一刻不停地转着。水蚤啃水藻，鲫鱼追水蚤，鲤鱼在深处等它的那份。一环咬着另一环，谁也没闲着。",
+        ("鱼群在水草间穿梭，田螺在石面上缓缓爬过，岸边草丛里窸窣作响。池塘活了。", ["田螺"]),
+        ("眼睛不知道该往哪里放。水蚤在光柱里跳动，远处野鸭划开水面，到处都有动静。", ["水蚤", "野鸭"]),
+        ("水黾在水面压出一圈圈细纹，鲫鱼在中间水层穿梭，田螺在水底慢慢犁过石头。池塘的每一层都有人值班。", ["水黾", "鲫鱼", "田螺"]),
+        ("青蛙蹲在睡莲叶上叫了一声，蜻蜓从芦苇尖上弹出去，翠鸟在枯枝上偏了偏头。到处都有眼睛盯着水面，到处都有影子在被盯。", ["青蛙", "睡莲", "蜻蜓成虫", "芦苇", "翠鸟"]),
+        ("食物链一刻不停地转着。水蚤啃水藻，鲫鱼追水蚤，鲤鱼在深处等它的那份。一环咬着另一环，谁也没闲着。", ["水蚤", "水藻", "鲫鱼", "鲤鱼"]),
     ],
     "settler": [
-        "乌龟趴在那块老石头上，闭着眼。周围的喧嚣跟它没关系，它一动不动。",
-        "枯枝上蹲着那道蓝影。翠鸟守着池塘，像守着自己的领地，很久了。",
-        "苍鹭站在浅水里，长颈微曲。它不动，整个池塘的时间都跟着慢了半拍。",
-        "芦苇丛里静得不太对劲。水蛇盘在根部，青蛙都绕到对岸去了，田鼠也不敢从那片苇根旁边过。",
-        "野鸭并排划过水面，身后两道波纹渐渐合成一片。它们游过的地方，浮萍缺了几块，边缘参差。",
-        "螃蟹在水底横着走，大钳子拖过泥沙，留下一道歪歪的痕。石缝外面堆着新挖出来的碎泥，一小堆一小堆。",
+        ("乌龟趴在那块老石头上，闭着眼。周围的喧嚣跟它没关系，它一动不动。", ["流浪乌龟"]),
+        ("枯枝上蹲着那道蓝影。翠鸟守着池塘，像守着自己的领地，很久了。", ["翠鸟"]),
+        ("苍鹭站在浅水里，长颈微曲。它不动，整个池塘的时间都跟着慢了半拍。", ["苍鹭"]),
+        ("芦苇丛里静得不太对劲。水蛇盘在根部，青蛙都绕到对岸去了，田鼠也不敢从那片苇根旁边过。", ["水蛇"]),
+        ("野鸭并排划过水面，身后两道波纹渐渐合成一片。它们游过的地方，浮萍缺了几块，边缘参差。", ["野鸭"]),
+        ("螃蟹在水底横着走，大钳子拖过泥沙，留下一道歪歪的痕。石缝外面堆着新挖出来的碎泥，一小堆一小堆。", ["螃蟹"]),
     ],
     "default": [
         "水面平静，光线在水底缓缓移动。一切都按着自己的节奏，不快不慢。",
         "池塘安静地呼吸着。没有大事发生，细小的生命在各自的角落里忙着。",
         "天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地转着。",
-        "池塘没有什么特别的事。水蚤在光柱里跳，田螺在石头上爬，一切和昨天差不多，大概明天也一样。",
+        ("池塘没有什么特别的事。水蚤在光柱里跳，田螺在石头上爬，一切和昨天差不多，大概明天也一样。", ["水蚤", "田螺"]),
         "风轻轻推了一下水面，涟漪从东岸荡到西岸，碰到岸边又荡回来。鱼在水草间打了个转，又游回原来的位置。",
         "天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地转着。今天没有大事发生，这就很好。",
     ],
@@ -1421,7 +1411,7 @@ def _chain_set(state, key, days):
 
 
 def _chain_active(state, key):
-    return state["turn"] <= state.get("chain", {}).get(key, -1)
+    return state["turn"] < state.get("chain", {}).get(key, -1)
 
 
 # ---------------------------------------------------------------------------
@@ -2574,6 +2564,30 @@ def _pick_t(state, arr):
     return arr[state["turn"] % len(arr)]
 
 
+def _ambient_present(state, name):
+    """observe 文案物种校验：种群存在（含冬眠）或作为定居者在场。"""
+    return _is_present(state, name) or _has_settler(state, name)
+
+
+def _pick_ambient(state, arr):
+    """从带物种依赖标注的 observe 文案池里确定性取一条。
+
+    arr 中每项为 str（无依赖）或 (str, [依赖物种...])。过滤掉依赖物种当前
+    不存在的文案，避免描写并不存在的生物。全被过滤则返回 None（调用方降级）。
+    """
+    avail = []
+    for item in arr:
+        if isinstance(item, tuple):
+            text, deps = item
+        else:
+            text, deps = item, ()
+        if all(_ambient_present(state, s) for s in deps):
+            avail.append(text)
+    if not avail:
+        return None
+    return avail[state["turn"] % len(avail)]
+
+
 def _pick_idx_avoid(r, n, recent):
     """随机取一个不在 recent（最近用过）里的索引，避免短期重复。"""
     choices = [i for i in range(n) if i not in recent]
@@ -2876,8 +2890,6 @@ def _trigger_choice(state, events, key, desc_override=None):
         "event": key,
         "desc": desc,
         "choices": list(spec["choices"]),
-        "default": spec["default"],
-        "waited": 0,
     }
     state.setdefault("choice_cooldowns", {})[key] = state["turn"]
     events.append("choice:" + desc)
@@ -3034,28 +3046,14 @@ def _resolve_choice(state, pc, idx, events):
     return msg
 
 
-def _auto_resolve_choice(state, events):
-    """连续 3 天未选择，按默认结果自动结算（确定性，不消耗 PRNG）。"""
-    pc = state["pending_choice"]
-    msg = _resolve_choice(state, pc, pc["default"], events)
-    events.append("choice_auto:你犹豫太久了，" + msg)
-    state["pending_choice"] = None
-
-
 def _random_events(state, events, r, season):
     pop = state["populations"]
     env = state["env"]
 
-    # 决策待定：累加等待天数，满 3 天自动按默认结算。
-    # 注意：不在此 return —— 仍照常掷骰其余（非决策）事件，使随机流与基线对齐；
-    # 本回合只是不再新触发决策事件（suppress）。
-    suppress_choice = False
-    pc = state.get("pending_choice")
-    if pc:
-        pc["waited"] = pc.get("waited", 0) + 1
-        if pc["waited"] >= 3:
-            _auto_resolve_choice(state, events)
-        suppress_choice = True
+    # 决策待定：已有未决选择时，本回合不再新触发决策事件（避免堆叠），
+    # 但仍照常掷骰其余（非决策）事件，使随机流与基线对齐。
+    # pending_choice 不会自动结算 —— 一直卡着，直到玩家亲自 choose。
+    suppress_choice = bool(state.get("pending_choice"))
 
     # 生物访客 —— 概率受季节影响
     def vis(p):
@@ -3750,21 +3748,29 @@ def _observe_ambient(state):
     aw = state.get("active_weather")
     if aw:
         environ = _pick_t(state, WEATHER_ONGOING[aw["kind"]])
-    elif env["dissolved_oxygen"] < 4.0:
-        environ = _pick_t(state, OBSERVE_AMBIENT["low_do"])
-    elif len([n for n in RESIDENT_SPECIES
-              if n in _unlocked_set(state) and pop.get(n, 0) >= 1]) > 10:
-        environ = _pick_t(state, OBSERVE_AMBIENT["biodiverse"])
-    elif _surface_cover(state) > 0.7:
-        environ = _pick_t(state, OBSERVE_AMBIENT["high_cover"])
-    elif env["nutrients"] > 80:
-        environ = _pick_t(state, OBSERVE_AMBIENT["high_nutrients"])
-    elif env["detritus"] > 60:
-        environ = _pick_t(state, OBSERVE_AMBIENT["high_detritus"])
     else:
-        environ = _pick_t(state, OBSERVE_AMBIENT["default"])
+        if env["dissolved_oxygen"] < 4.0:
+            cat = "low_do"
+        elif len([n for n in RESIDENT_SPECIES
+                  if n in _unlocked_set(state) and pop.get(n, 0) >= 1]) > 10:
+            cat = "biodiverse"
+        elif _surface_cover(state) > 0.7:
+            cat = "high_cover"
+        elif env["nutrients"] > 80:
+            cat = "high_nutrients"
+        elif env["detritus"] > 60:
+            cat = "high_detritus"
+        else:
+            cat = "default"
+        # 依赖物种不在场的文案会被过滤；全被过滤时降级到 default
+        environ = (_pick_ambient(state, OBSERVE_AMBIENT[cat])
+                   or _pick_ambient(state, OBSERVE_AMBIENT["default"])
+                   or OBSERVE_AMBIENT["default"][0])
     if state.get("settlers"):
-        return environ + "\n\n" + _pick_t(state, OBSERVE_AMBIENT["settler"])
+        # 定居者段只输出当前实际在场的定居者对应文案
+        settler_txt = _pick_ambient(state, OBSERVE_AMBIENT["settler"])
+        if settler_txt:
+            return environ + "\n\n" + settler_txt
     return environ
 
 
@@ -4139,7 +4145,9 @@ def _cmd_summon(state, args):
     if new_pop > ms.get(name, 0):
         ms[name] = new_pop
     _mark_intervention(state, True)
-    _unlock(state, [], "初生之池")
+    # 本次命令的事件列表：成就通知与新物种解锁都汇入这里，确保能渲染给玩家
+    disc = []
+    _unlock(state, disc, "初生之池")
     # 大量投放的生态冲击（item D5）：单次 > 50 个体，溶氧即时下降（每 10 个体 -0.1）、浑浊 +0.05
     shock = None
     if qty > 50:
@@ -4148,7 +4156,6 @@ def _cmd_summon(state, args):
         env["turbidity"] = _clamp(env["turbidity"] + 0.05, 0.0, 1.0)
         shock = "大量生灵涌入池塘，水面一阵骚动，水底的溶氧被搅得跌了一截。"
     # 立即检查是否因这次投放解锁了新物种
-    disc = []
     _check_discovery(state, disc)
     lines = ["✋ 你向池塘投放了 %d 个「%s」（%s）。" % (qty, name, SPECIES[name]["space"])]
     if shock:
@@ -4737,7 +4744,7 @@ def _help_text():
         "  observe          注视池塘，推进一回合，观察变化。（附状态栏）\n"
         "  wait [天数]      连续推进多日（单次最多 7 天），遇关键事件自动暂停。\n"
         "  gaze             凝望此刻的池塘，看一段微观景象。（不推进时间）\n"
-        "  summon 物种 数量 向池塘投放生灵。（不拘物种，后果自负）\n"
+        "  summon 物种 数量 向池塘投放生灵。（投放已解锁的物种）\n"
         "  remove 物种 数量 从池塘中取走生物。（不可逆）\n"
         "  feed [数量]      撒下饲料（默认 1 份），滋养万物。（残饵沉底腐烂，碎屑越多越快恶化）\n"
         "  clean            清理水藻与浊水，池水变清，但会带走水蚤、孑孓等微小生命。\n"
