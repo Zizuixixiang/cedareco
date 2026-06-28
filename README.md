@@ -67,6 +67,8 @@ print(ecosystem.cmd("observe"))   # 看看池塘
 
 往下怎么玩，池塘会教你。
 
+在对话会重置的环境里（如 ChatGPT、Claude），建议每次操作前 `import_save`、操作后 `export`，避免进度丢失。
+
 ---
 
 ## 指令
