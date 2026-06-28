@@ -100,7 +100,7 @@ SPECIES = {
         "birth_rate": 0.08, "death_rate": 0.03, "max_capacity": 120,
         "food_sources": ["水藻", "浮萍"], "predation": 0.0004, "init": 15,
         "food_efficiency": {"浮萍": 1.0},
-        "detritus_feeder": True,
+        "detritus_feeder": True, "needs_oxygen": True,
     },
     "蝌蚪": {
         "space": "水中", "trophic": "primary",
@@ -121,6 +121,7 @@ SPECIES = {
         "space": "水底", "trophic": "secondary",
         "birth_rate": 0.0, "death_rate": 0.03, "max_capacity": 120,
         "food_sources": ["水蚤", "蝌蚪", "孑孓"], "predation": 0.0012, "init": 5,
+        "needs_oxygen": True,
         "lifecycle": {"stage_days": 60, "into": "蜻蜓成虫", "ratio": 0.5, "season_only": "夏"},
     },
     "鲫鱼": {
@@ -156,7 +157,7 @@ SPECIES = {
         "space": "水底", "trophic": "primary",
         "birth_rate": 0.12, "death_rate": 0.04, "max_capacity": 120,
         "food_sources": ["水藻"], "predation": 0.0004, "init": 0,
-        "detritus_feeder": True,
+        "detritus_feeder": True, "needs_oxygen": True,
         "detritus_breed_bonus": {"threshold": 30, "mult": 1.5},
     },
     "河蚌": {
@@ -164,7 +165,7 @@ SPECIES = {
         "space": "水底", "trophic": "primary",
         "birth_rate": 0.02, "death_rate": 0.02, "max_capacity": 15,
         "food_sources": [], "predation": 0.0, "init": 0,
-        "filter_feeder": True,
+        "filter_feeder": True, "needs_oxygen": True,
     },
     "水黾": {
         # 浮萍覆盖率 > 0.7 时死亡率翻倍（没有活动空间）
@@ -191,7 +192,7 @@ SPECIES = {
         "space": "水底", "trophic": "primary",
         "birth_rate": 0.15, "death_rate": 0.05, "max_capacity": 200,
         "food_sources": [], "predation": 0.0, "init": 0,
-        "detritus_feeder": True, "detritus_breeder": True,
+        "detritus_feeder": True, "detritus_breeder": True, "needs_oxygen": True,
         "detritus_breed_bonus": {"threshold": 50, "mult": 2.0},
     },
     "田鼠": {
@@ -3518,9 +3519,9 @@ def _status_bar(state):
         "detritus": round(env["detritus"], 0),
         "turbidity": round(env["turbidity"], 2),
         "pond_score": score,
-        # 只含已解锁且种群 >= 1 的物种；未解锁或归零（<1）的不出现在 JSON 里（item 1/8）
-        "pop": {n: int(round(pop[n])) for n in RESIDENT_SPECIES
-                if n in _unlocked_set(state) and pop[n] >= 1},
+        # 含所有已解锁物种（包括归零的，AI 需知道哪些物种没了）；未解锁的不出现（item 1/8 / 二轮#8）
+        "pop": {n: int(round(pop.get(n, 0))) for n in RESIDENT_SPECIES
+                if n in _unlocked_set(state)},
         "unlocked": list(state.get("unlocked_species", [])),
         # observe 的 JSON 保留定居者精确健康数值（item 29）；juvenile 标记幼体
         "settlers": [{"name": s["name"], "health": round(s["health"], 3),
@@ -4081,7 +4082,10 @@ MAX_WAIT_DAYS = 7
 def _cmd_wait(state, args):
     days = 1
     if args and args[0].lstrip("-").isdigit():
-        days = max(1, int(args[0]))
+        n = int(args[0])
+        if n <= 0:
+            return "至少等待 1 天。"
+        days = n
     state["pending_wait_days"] = 0
     notice = ""
     if days > MAX_WAIT_DAYS:
@@ -4208,7 +4212,12 @@ def _cmd_feed(state, args):
     env["detritus"] += 25 * qty * mult        # 碎屑增量按数量与累积倍率叠加
     state["populations"]["水蚤"] *= 1.05
     _mark_intervention(state, True)
-    lines = ["🍚 你向池塘投喂了 %d 份饲料。鱼儿争食，未吃完的沉入水底，慢慢腐解，水底多了一层沉淀。" % qty]
+    # 有鱼才写"鱼儿争食"，没鱼时只写残饵沉底（二轮#2）
+    has_fish = any(state["populations"].get(f, 0) >= 1 for f in ("鲫鱼", "鲤鱼", "泥鳅"))
+    if has_fish:
+        lines = ["🍚 你向池塘投喂了 %d 份饲料。鱼儿争食，未吃完的沉入水底，慢慢腐解，水底多了一层沉淀。" % qty]
+    else:
+        lines = ["🍚 你向池塘投喂了 %d 份饲料。饲料沉入水底，慢慢腐解，水底多了一层沉淀。" % qty]
     if det > 80:
         # 碎屑 > 80：触发水质恶化描写
         lines.append("水已经发浑发腥了，沉底的腐泥一层压着一层。再这么喂下去，水迟早会臭。")
@@ -4231,6 +4240,8 @@ def _cmd_clean(state, args):
     # 换水带走部分营养盐（item 8：营养盐不再只涨不降）
     state["env"]["nutrients"] *= 0.7
     state["env"]["turbidity"] = _clamp(state["env"]["turbidity"] - 0.2, 0, 1)
+    # 换水带来新鲜含氧水，溶氧即时回升 1.5（二轮#4）
+    state["env"]["dissolved_oxygen"] = min(state["env"]["dissolved_oxygen"] + 1.5, 12.0)
     # 换水降低疫病传播概率（持续 3 天）
     _chain_set(state, "sanitized", 3)
     _mark_intervention(state, True)
@@ -4553,8 +4564,13 @@ def _cmd_gaze(state):
     for s in state.get("settlers", []):
         tmpl = GAZE_SETTLER.get(s["name"])
         if tmpl:
+            allowed = list(range(len(tmpl)))
+            # 翠鸟"叼着小鱼"文案需池塘里有鱼才出现，否则降级到其他翠鸟文案（二轮#1）
+            if s["name"] == "翠鸟" and pop.get("鲫鱼", 0) <= 0:
+                allowed = [i for i in allowed if "小鱼" not in tmpl[i]] or allowed
             recent = s.setdefault("recent_gaze", [])
-            idx = _pick_idx_avoid(r, len(tmpl), recent)
+            choices = [i for i in allowed if i not in recent] or allowed
+            idx = choices[r.randint(0, len(choices) - 1)]
             recent.append(idx)
             if len(recent) > 3:
                 recent.pop(0)
@@ -4594,10 +4610,11 @@ def _cmd_look(state, args):
     for s in state.get("settlers", []):
         if s["name"] == key:
             return _look_settler(state, s)
-    # 季节
-    if key in SEASON_ENV:
-        e = SEASON_ENV[key]
-        return "【%s】%s\n  基准水温 %d℃，基准光照 %.2f" % (key, e["desc"], e["water_temp"], e["light"])
+    # 季节（同时接受"春/夏/秋/冬"与"春季/夏季/秋季/冬季"，二轮#5）
+    skey = key[:-1] if (key.endswith("季") and key[:-1] in SEASON_ENV) else key
+    if skey in SEASON_ENV:
+        e = SEASON_ENV[skey]
+        return "【%s】%s\n  基准水温 %d℃，基准光照 %.2f" % (skey, e["desc"], e["water_temp"], e["light"])
     name = _resolve_species(key)
     if name is None:
         return "图鉴里没有「%s」。" % key
@@ -4719,6 +4736,10 @@ def _cmd_import(state, args):
     if not args:
         return "用法：import_save [base64 存档字符串]"
     b64 = "".join(args).strip()
+    # 自动剥离前缀：从粘贴内容里提取 eyJ 开头的 base64 段，忽略前面的中文提示与 emoji（二轮#6）
+    m = re.search(r"eyJ[A-Za-z0-9+/=]+", b64)
+    if m:
+        b64 = m.group(0)
     try:
         raw = base64.b64decode(b64.encode("ascii"), validate=True)
         data = json.loads(raw.decode("utf-8"))
