@@ -237,21 +237,28 @@ RESIDENT_SPECIES = [k for k, v in SPECIES.items() if not v.get("hidden")]
 # ---------------------------------------------------------------------------
 # 通过随机事件到来、玩家收留后加入。按个体管理（age/health），不繁殖。
 
+# juvenile_days：幼体期天数；max_count：同种定居者数量上限；
+# brood_food：每个幼体每天额外消耗的一份"口粮"（默认取 daily_food）。
 SETTLER_TYPES = {
-    "流浪乌龟": {"max_age": 90, "daily_food": {"水藻": 2, "鲫鱼": 1}},
+    "流浪乌龟": {"max_age": 90, "daily_food": {"水藻": 2, "鲫鱼": 1},
+            "juvenile_days": 30, "max_count": 5},
     # daily_food 中的 "有机碎屑" 特殊处理：从环境 detritus 扣除
     "螃蟹": {"max_age": 120, "daily_food": {"田螺": 1, "河蚌": 0.5, "有机碎屑": 2},
-            "turbidity_per_day": 0.01},
-    "水蛇": {"max_age": 150, "daily_food": {"鲫鱼": 1, "青蛙": 0.5}},
+            "turbidity_per_day": 0.01, "juvenile_days": 20, "max_count": 6},
+    "水蛇": {"max_age": 150, "daily_food": {"鲫鱼": 1, "青蛙": 0.5},
+            "juvenile_days": 15, "max_count": 6},
     "野鸭": {"max_age": 180, "daily_food": {"浮萍": 3, "孑孓": 2},
-            "detritus_per_day": 2.0, "nutrients_per_day": 1.0},
+            "detritus_per_day": 2.0, "nutrients_per_day": 1.0,
+            "juvenile_days": 15, "max_count": 8},
     # 访客变常驻 —— 捕食型定居者（hunter）：按概率捕食，详见 _process_settlers
     #   每天 40% 安静（不出现在描写中），60% 触发捕食尝试；
     #   尝试成功率 40%（猎物总数 < 5 时降为 20%）；
     #   成功扣 1 猎物 + health 恢复 0.1；连续 5 天无成功才 health 每天 -0.05。
-    "翠鸟": {"max_age": 200, "hunter": {"prey": ["鲫鱼"]}},
+    "翠鸟": {"max_age": 200, "hunter": {"prey": ["鲫鱼"]},
+            "brood_food": {"鲫鱼": 1}, "juvenile_days": 20, "max_count": 4},
     "苍鹭": {"max_age": 180, "hunter": {"prey": ["鲫鱼", "泥鳅"]},
-            "on_settle_flag": "heron_resident"},
+            "on_settle_flag": "heron_resident",
+            "brood_food": {"鲫鱼": 1, "泥鳅": 1}, "juvenile_days": 25, "max_count": 3},
 }
 
 # 定居者叙事文案（到来 / 饥饿离开 / 年迈离开 + 各自的年鉴记录）
@@ -326,6 +333,157 @@ HERON_MISS = [
     "苍鹭在浅水里站了很久，长喙始终没有刺下去。水里没有鱼经过。它慢慢收拢翅膀，飞远了。",
     "浅水区空空荡荡。苍鹭换了几处位置，最终还是展开宽大的翅膀，朝别处飞去了。",
 ]
+
+# 定居者繁殖事件文案（每种 3 套）
+SETTLER_BREED = {
+    "翠鸟": [
+        "枯枝上的巢里多了三枚蛋，白得像小颗的卵石。翠鸟伏在上面，蓝羽毛把蛋盖得严严实实。",
+        "蛋壳裂了一道缝。从缝里探出一张嫩黄的喙，张了一下，又缩回去。翠鸟歪着头看。",
+        "两只毛茸茸的脑袋从巢沿探出来，喙还是灰的，还没有长出它们父母那样的蓝。",
+    ],
+    "苍鹭": [
+        "苍鹭伏在巢上，长颈缩在肩膀里。巢里的蛋被它的体温捂着，在晨光中微微发暖。",
+        "一只灰绒绒的幼鸟从巢里站起来，腿太长了，站不稳，晃了两下又跌坐回去。",
+        "幼鸟笨拙地展开翅膀，翅膀太大了，它不知道该往哪里放。苍鹭站在旁边，没有帮忙。",
+    ],
+    "野鸭": [
+        "母鸭从巢上起身，底下露出七八枚淡青色的蛋。她用喙轻轻拨了拨，又重新伏上去。",
+        "小鸭从巢里跌出来，毛茸茸的一团，落在水面上像一小片浮萍。它划了两下蹼，稳住了。",
+        "母鸭在前面游，身后跟着一串小鸭，排成一道歪歪扭扭的线。小鸭的蹼太小了，划得水面轻轻发颤。",
+    ],
+    "流浪乌龟": [
+        "乌龟在岸边沙地上刨了一个坑。它把蛋一颗一颗产进去，再用后腿把沙拨回去，拍平。",
+        "沙面上有什么在拱。一小块沙塌下去，一只小龟爬出来，壳还是软的，身上沾满沙粒。",
+        "几只小龟朝着水面的方向爬去，爬得很慢。水面的光映在它们湿漉漉的壳上，壳还没变硬。",
+    ],
+    "螃蟹": [
+        "母蟹翻过身，腹部的甲片张开，露出一团密密麻麻的卵。她用钳子轻轻拨动，让水流冲洗卵团。",
+        "卵团散开了。无数透明的小蟹从卵里挣脱出来，在水里浮浮沉沉，细得像沙子。",
+        "小蟹沉到水底，各自找了一块小石头，缩在底下。它们还太小，还举不起钳子。",
+    ],
+    "水蛇": [
+        "芦苇丛深处，水蛇产下一排软壳的卵，粘在枯茎的根部。卵在湿泥里微微发亮。",
+        "一枚卵破了。一条细小的水蛇探出头来，吐了吐信子，慢慢滑进浅水里。",
+        "几条幼蛇盘在芦苇根部，鳞片还是浅灰色的。它们缩成一团，彼此缠在一起，分不清头尾。",
+    ],
+}
+
+# 幼体成长完成文案（每种 5 套）
+SETTLER_GROWN = {
+    "翠鸟": [
+        "小翠鸟从枯枝上探出身子，盯了水面很久。它终于俯冲下去——扑了个空，水花溅了一脸。它抖抖羽毛，又飞回枝头。",
+        "它第一次叼着一条鲫鱼飞回枝头，鱼太小了，但小翠鸟仰头的姿势跟它父母一模一样。",
+        "小翠鸟的喙从灰色变成了黑色。它在枝头整理羽毛，蓝光在翅膀上第一次闪了出来。",
+        "它不再回巢过夜了。自己在另一根枯枝上停了一整晚，晨光里，羽毛上凝着细密的露水。",
+        "那只幼鸟已经分不出是哪一只了。它蹲在枝头，像一滴蓝墨水滴在枯木上，安静，从容。",
+    ],
+    "苍鹭": [
+        "小苍鹭站在浅水里，第一次独自等待。它站了很久，长喙刺下去——只刺起一嘴水草。它甩甩头，又重新摆好姿势。",
+        "幼鸟的灰绒褪尽了，换上一身白灰的羽毛。它在岸边慢慢走动，长腿抬得跟成鸟一样缓。",
+        "小苍鹭第一次叼起一条泥鳅，泥鳅扭了太久，差点从喙里滑掉。它仰头吞下，站得更直了。",
+        "它不再跟在成鸟后面。自己在池塘的另一头巡视，影子倒映在水里，已经是一副完整的苍鹭轮廓。",
+        "那只苍鹭站在浅水里，长颈微曲，一动不动。没有人再能分出它是哪一年来的了。",
+    ],
+    "野鸭": [
+        "小鸭的绒毛褪了，换上一身褐色的羽毛。它第一次独自下水，没有跟在母鸭后面。",
+        "幼鸭拍打翅膀，在水面上踩出一长串水花。它飞起来了——只离水半尺，又落回去。但它飞起来了。",
+        "小鸭的颈上冒出了第一片绿斑，在光里闪了一下。它学着公鸭的样子，昂起头游过水面。",
+        "它开始自己在芦苇丛边找食，把头埋进水里，尾巴朝天翘起，跟成鸟一模一样的姿势。",
+        "那群小鸭已经分不出了。它们并排游着，颈子一前一后地摆动，身后两道波纹渐渐合成一片。",
+    ],
+    "流浪乌龟": [
+        "小龟的壳变硬了。它在水底慢慢爬过一块石头，壳擦过石面，发出一声轻响——不再是软的。",
+        "小龟第一次爬上那块半露出水面的石头，脖子伸得老长，学着大龟的样子晒太阳。",
+        "它在水底找到一片水藻，自己啃了起来。石面上多了一小块干净的灰白。",
+        "那只小龟不再躲进石缝里了。它在水底慢慢爬过，身后扬起一小片泥沙，像一个微型的犁。",
+        "乌龟趴在那块老石头上，壳上的纹路已经深了一层。谁也记不清它是什么时候从沙坑里爬出来的了。",
+    ],
+    "螃蟹": [
+        "小蟹的钳子长到能夹断水草了。它从石缝里横着挪出来，第一次没有倒退着弹回去。",
+        "幼蟹翻开一块小石头，底下的淤泥露出来。它在泥里翻找了一会儿，钳子夹起一小团碎屑。",
+        "小蟹蜕了壳。旧壳漂在水里，透明，完整，像一只鬼魂螃蟹。新壳的钳子挥了挥，更有力了。",
+        "它不再需要躲着鲫鱼。当一条鲫鱼凑太近，小蟹举起钳子，虚张声势——鲫鱼扭身游开了。",
+        "螃蟹在水底横着走，大钳子拖在身后。它翻石头、挖泥、吐泡泡，跟当年那只从浑水里爬出来的大蟹一模一样。",
+    ],
+    "水蛇": [
+        "幼蛇第一次独自滑入水中，细长的身体切开水面，留下一道浅浅的波纹。它游到对岸，又游回来。",
+        "小蛇在芦苇丛里蜕了第一次皮，半透明的蛇蜕挂在枯茎上轻轻晃动。它的鳞片变深了一层。",
+        "它第一次盯住了猎物。一只青蛙从面前跳过，幼蛇出击——慢了。青蛙逃开了。小蛇收回身子，重新盘好。",
+        "幼蛇不再盘在芦苇根部了。它在岸边一块石头上摊开身体，鳞片晒得发亮。",
+        "水蛇悄无声息地游过水面，头探向岸边，又慢慢收回去。没有人再能分出它是哪一年破壳的了。",
+    ],
+}
+
+SETTLER_BREED_CHRON = "%s 在池塘繁衍了下一代——池塘有了二代住客。"
+SETTLER_GROWN_CHRON = "那只幼年的%s长成了，开始独自在池塘讨生活。"
+
+# 定居者食物不足预警（每种 轻/重 各 3 套）
+SETTLER_WARN_LIGHT = {
+    "翠鸟": [
+        "翠鸟在枝头偏了好几次头，盯着水面看了很久。水下的影子太少，它一直没有俯冲。",
+        "翠鸟的叫声变多了，短促，尖细，像是在对水面发问。水面没有回答。",
+        "它从这根枝头飞到那根枝头，又飞回来。喙里空空的，爪子在枯枝上不安地挪动。",
+    ],
+    "苍鹭": [
+        "苍鹭在浅水里站了很久，长喙始终没有刺下去。它换了一个位置，又换了一个。水底的影子太少了。",
+        "苍鹭不再慢慢巡视。它走得比平时快，长腿在水里搅出声响，惊散了本就稀少的鱼影。",
+        "它站在岸边，长颈伸直，望向池塘深处。收拢的翅膀轻轻抖了一下，像是在犹豫。",
+    ],
+    "野鸭": [
+        "野鸭把头埋进水里，又很快冒出来。换了一个位置，又埋进去。水下的食物在变少。",
+        "母鸭在岸边来来回回地走，喙在泥里翻了几下，又抬头看看水面，又低头翻。",
+        "野鸭不再悠闲地划水。它们游得很快，从池塘这头到那头，像是在找什么。",
+    ],
+    "流浪乌龟": [
+        "乌龟在水底爬了很久，石面上再也没有啃出来的那一小块灰白。它停在一块石头前，很久没动。",
+        "乌龟从这块石头爬到那块石头，脖子伸得长长的。石头上只有薄薄一层苔，啃不饱。",
+        "它浮上水面换气，停了很久才沉下去。不是悠闲的那种停，是累了。",
+    ],
+    "螃蟹": [
+        "螃蟹翻遍水底的石头，翻一块，停一下，再翻下一块。石头底下什么都没有了。",
+        "螃蟹的钳子举着，却没有可以夹的东西。它在水底转了几圈，又回到石缝里，缩了进去。",
+        "它挖了一个很浅的坑就停住了。泥沙从钳子里漏下去，螃蟹没有继续挖。",
+    ],
+    "水蛇": [
+        "水蛇在芦苇丛里盘了又散，散了又盘。猎物没有经过，它把头重新埋进身体里。",
+        "水蛇滑入水中巡视了一圈，又空着回来。它在水边的石头上摊开，头搁在石沿，很久没有动。",
+        "水蛇的鳞片不如以前亮了。它蜷在芦苇根部，信子吐得很慢，像是在尝空气里的味道。",
+    ],
+}
+SETTLER_WARN_HEAVY = {
+    "翠鸟": [
+        "翠鸟站在池塘边缘的枯枝上，那根枝头离水面最远。它看着远方，翅膀微微张开又收拢。",
+        "它很久没有回巢了。巢里的幼鸟在叫，翠鸟停在远处的水边，喙里什么也没有。",
+        "翠鸟在枝头站了一整天。傍晚时它展开翅膀，朝远处飞了一段，又折回来。枯枝上空了一夜。",
+    ],
+    "苍鹭": [
+        "苍鹭站在池塘边缘，一只脚已经踏上了岸。它回望了一眼水面，又转回去，翅膀半张着。",
+        "它衔起巢边一根枯枝，又放下了。苍鹭在巢边踱了几步，然后把长喙指向了远方的天空。",
+        "苍鹭展开宽大的翅膀，飞了起来。它在池塘上空盘旋了一圈，两圈。然后朝远处飞去，没有再回头。",
+    ],
+    "野鸭": [
+        "野鸭站在岸边，头转向远方。母鸭叫了几声，声音短促。小鸭挤在她身边，不再下水。",
+        "它们站在池塘边缘，翅膀不时拍打几下。水面上再没有并排游过的波纹，只有风吹的。",
+        "清晨，野鸭起飞了。翅膀扇动的声音在水面上空响了很久，然后越来越远，终于听不见了。",
+    ],
+    "流浪乌龟": [
+        "乌龟爬上了岸边。它停在泥岸上，头朝着草丛的方向，一动不动，像是在判断什么。",
+        "它在岸边徘徊了整整一个下午，沿着水线慢慢爬，壳上沾满干泥，始终没有回到水里。",
+        "乌龟最后一次爬上那块晒了那么久的石头，停了一会儿。然后它爬下来，朝草丛深处慢慢挪去，再也没有回来。",
+    ],
+    "螃蟹": [
+        "螃蟹横着爬到池塘边缘，一只钳子搭上了岸边。它在那里停住，像是在等什么。",
+        "它不再回石缝了。在水底漫无目的地横着走，吐出的气泡越来越少。",
+        "螃蟹爬出了池塘。它横着爬上泥岸，身后留下一行歪歪的爪印，一直延伸到草丛深处。",
+    ],
+    "水蛇": [
+        "水蛇滑到池塘最边缘的芦苇丛里，头探向岸上。它在那里停了很久，身体慢慢展开。",
+        "它不再盘踞原来的芦苇丛。水蛇游到池塘出水口的方向，那里的水流向外面的世界。",
+        "水蛇缓缓滑进芦苇深处，身体在枯茎间一闪一闪，越来越远，终于看不到了。",
+    ],
+}
+SETTLER_WARN_CHRON_LIGHT = "%s 开始吃不饱了。"
+SETTLER_WARN_CHRON_HEAVY = "%s 濒临饿死，命悬一线。"
 
 # ---------------------------------------------------------------------------
 # 2c. 决策事件（choose 机制）
@@ -966,6 +1124,7 @@ ACHIEVEMENTS = {
     "共生之池": "同时存在 15 种以上物种",
     "睡莲花开": "盛夏里睡莲第一次开花",
     "疫病爆发": "经历了一次疫病",
+    "池塘二代": "第一次在池塘见证定居者的后代",
 }
 
 
@@ -2081,14 +2240,22 @@ def _folio_update_species(state):
         e["alive"] = alive
 
 
+def _new_settler_dict(name, juvenile=False):
+    t = SETTLER_TYPES[name]
+    return {
+        "name": name, "age": 0, "health": 1.0,
+        "max_age": t["max_age"], "daily_food": dict(t.get("daily_food", {})),
+        "since_hunt": 0,            # 距上次成功捕食的天数（hunter 用）
+        "juvenile": juvenile,       # 是否幼体（不自己捕食，靠父母代偿）
+        "juvenile_left": t.get("juvenile_days", 0) if juvenile else 0,
+        "warn_level": 0,            # 食物不足预警等级（0/1/2，去重 chronicle）
+    }
+
+
 def _add_settler(state, name):
     """收留一名定居者，加入列表并登记定居者志。"""
     t = SETTLER_TYPES[name]
-    state["settlers"].append({
-        "name": name, "age": 0, "health": 1.0,
-        "max_age": t["max_age"], "daily_food": dict(t.get("daily_food", {})),
-        "since_hunt": 0,   # 距上次成功捕食的天数（hunter 用）
-    })
+    state["settlers"].append(_new_settler_dict(name, juvenile=False))
     rec = state["folio"]["settlers"].setdefault(name, {"times": 0, "max_days": 0})
     rec["times"] += 1
     # 定居时设置的永久标记（如苍鹭定居→鱼群学会躲藏）
@@ -2191,39 +2358,73 @@ def _settler_hunt(state, s, hunter, events, r):
         s["health"] = round(s["health"] - 0.05, 3)
 
 
-def _settler_graze(state, s, events, r):
-    """非捕食型定居者（乌龟/螃蟹/水蛇/野鸭）：按 daily_food 取食，缺食扣 health。"""
+def _consume_food(state, s, food):
+    """从环境/种群扣除一份口粮；任一项不足则 health -0.1。"""
     pop = state["populations"]
     env = state["env"]
     short = False
-    for food, amt in s["daily_food"].items():
-        if food == "有机碎屑":
+    for f, amt in food.items():
+        if f == "有机碎屑":
             if env["detritus"] >= amt:
                 env["detritus"] -= amt
             else:
                 env["detritus"] = 0.0
                 short = True
             continue
-        have = pop.get(food, 0)
+        have = pop.get(f, 0)
         if have >= amt:
-            pop[food] = have - amt
+            pop[f] = have - amt
         else:
-            pop[food] = 0.0
+            pop[f] = 0.0
             short = True
     if short:
         s["health"] = round(s["health"] - 0.1, 3)
 
 
+def _settler_graze(state, s, events, r):
+    """非捕食型定居者（乌龟/螃蟹/水蛇/野鸭）：按 daily_food 取食，缺食扣 health。"""
+    _consume_food(state, s, s["daily_food"])
+
+
+def _settler_warn_chronicle(state, s):
+    """食物不足预警：跨过 0.5 / 0.3 阈值时各记一次 chronicle（去重，恢复后可再触发）。"""
+    h = s["health"]
+    name = s["name"]
+    lvl = s.get("warn_level", 0)
+    if h < 0.3 and lvl < 2:
+        s["warn_level"] = 2
+        _chronicle(state, SETTLER_WARN_CHRON_HEAVY % name)
+    elif 0.3 <= h < 0.5 and lvl < 1:
+        s["warn_level"] = 1
+        _chronicle(state, SETTLER_WARN_CHRON_LIGHT % name)
+    elif h >= 0.5 and lvl != 0:
+        s["warn_level"] = 0
+
+
 def _process_settlers(state, events, r):
-    """定居者每日摄食 + 衰老 + 特殊效果结算（在种群 LV 计算之后）。"""
+    """定居者每日摄食 + 幼体成长 + 衰老 + 繁殖（在种群 LV 计算之后）。"""
     env = state["env"]
+    season = state["season"]
     survivors = []
     for s in state["settlers"]:
         s["age"] += 1
         name = s["name"]
         cfg = SETTLER_TYPES.get(name, {})
-        # 冬季变温动物：水蛇不捕食，寒冷消耗 health 每天 -0.02（item 五）
-        if state["season"] == "冬" and name == "水蛇":
+        # 幼体成长：到期转为独立定居者
+        if s.get("juvenile"):
+            s["juvenile_left"] = s.get("juvenile_left", cfg.get("juvenile_days", 0)) - 1
+            if s["juvenile_left"] <= 0:
+                s["juvenile"] = False
+                grown = SETTLER_GROWN.get(name)
+                if grown:
+                    events.append("settler_birth:" + _pick(r, grown))
+                _chronicle(state, SETTLER_GROWN_CHRON % name)
+        # 摄食
+        if s.get("juvenile"):
+            # 幼体不自己捕食，靠父母多养一张嘴：额外消耗一份口粮
+            _consume_food(state, s, cfg.get("brood_food") or cfg.get("daily_food", {}))
+        elif season == "冬" and name == "水蛇":
+            # 冬季变温动物：水蛇不捕食，寒冷消耗 health 每天 -0.02（item 五）
             s["health"] = round(s["health"] - 0.02, 3)
         elif cfg.get("hunter"):
             _settler_hunt(state, s, cfg["hunter"], events, r)
@@ -2237,6 +2438,8 @@ def _process_settlers(state, events, r):
             env["detritus"] += cfg["detritus_per_day"]
         if cfg.get("nutrients_per_day"):
             env["nutrients"] += cfg["nutrients_per_day"]
+        # 食物不足预警（chronicle 去重）
+        _settler_warn_chronicle(state, s)
         # 每日更新万物志最长存活记录（item 6）
         rec = state["folio"]["settlers"].setdefault(name, {"times": 0, "max_days": 0})
         if s["age"] > rec.get("max_days", 0):
@@ -2255,6 +2458,20 @@ def _process_settlers(state, events, r):
             _chronicle(state, leave_chron)
         else:
             survivors.append(s)
+    # 繁殖：同种 >= 2，春夏季每天 5% 概率，未达上限则添一只幼体
+    if season in ("春", "夏"):
+        counts = {}
+        for s in survivors:
+            counts[s["name"]] = counts.get(s["name"], 0) + 1
+        for name, cnt in list(counts.items()):
+            cap = SETTLER_TYPES.get(name, {}).get("max_count", 99)
+            if cnt >= 2 and cnt < cap and r.chance(0.05):
+                survivors.append(_new_settler_dict(name, juvenile=True))
+                bred = SETTLER_BREED.get(name)
+                if bred:
+                    events.append("settler_birth:" + _pick(r, bred))
+                _chronicle(state, SETTLER_BREED_CHRON % name)
+                _unlock(state, events, "池塘二代")
     state["settlers"] = survivors
 
 
@@ -2816,9 +3033,10 @@ def _status_bar(state):
         "pop": {n: int(round(pop[n])) for n in RESIDENT_SPECIES
                 if n in _unlocked_set(state) and pop[n] >= 1},
         "unlocked": list(state.get("unlocked_species", [])),
-        # observe 的 JSON 保留定居者精确健康数值（item 29）
+        # observe 的 JSON 保留定居者精确健康数值（item 29）；juvenile 标记幼体
         "settlers": [{"name": s["name"], "health": round(s["health"], 3),
-                      "age": s["age"]} for s in state.get("settlers", [])],
+                      "age": s["age"], "juvenile": s.get("juvenile", False)}
+                     for s in state.get("settlers", [])],
         "pending_choice": bool(pc),
         "choices": list(pc["choices"]) if pc else [],
         "events": [
@@ -2835,7 +3053,7 @@ EVENT_ICONS = {
     "crisis": "⚠️", "lifecycle": "🦋", "spawn": "🥚", "achievement": "🏆",
     "discover": "🔎", "choice": "❓", "choice_auto": "⌛", "settler": "🐢",
     "settler_hunt": "🐟", "settler_miss": "💨", "settler_leave": "🚪",
-    "weather": "🌫", "report": "📅", "disease": "🦠",
+    "settler_birth": "🐣", "weather": "🌫", "report": "📅", "disease": "🦠",
 }
 
 # 生物访客/灾害事件识别表：(body 关键片段, 标题名, 事件类型, 影响描述)
@@ -2957,6 +3175,14 @@ def _classify_event(ev):
         who = next((n for n in SETTLER_TYPES if n in body), "定居者")
         meta["name"] = who + "离开"
         meta["effect"] = "离开池塘"
+    elif tag == "settler_birth":
+        who = next((n for n in SETTLER_TYPES if n in body), "定居者")
+        if "长大" in body:
+            meta["name"] = who + "成年"
+            meta["effect"] = "幼体长成"
+        else:
+            meta["name"] = who + "繁殖"
+            meta["effect"] = "添了新一代"
     elif tag == "achievement":
         m = re.search(r"【(.+?)】", body)
         meta["name"] = m.group(1) if m else "成就"
@@ -3043,6 +3269,19 @@ def _observe_ambient(state):
     return _pick_t(state, OBSERVE_AMBIENT["default"])
 
 
+def _settler_warn_lines(state):
+    """定居者食物不足预警：health<0.5 轻预警 / <0.3 重预警（observe 中显示）。"""
+    out = []
+    for s in state.get("settlers", []):
+        h = s["health"]
+        name = s["name"]
+        if h < 0.3 and name in SETTLER_WARN_HEAVY:
+            out.append("· " + _pick_t(state, SETTLER_WARN_HEAVY[name]))
+        elif h < 0.5 and name in SETTLER_WARN_LIGHT:
+            out.append("· " + _pick_t(state, SETTLER_WARN_LIGHT[name]))
+    return out
+
+
 def _water_degrade_lines(state):
     """水质恶化的简短叙事反馈（item 16），与 gaze 环境描写对齐但更短。"""
     env = state["env"]
@@ -3068,6 +3307,8 @@ def _observe_text(state, events):
     lines.append("· " + _observe_ambient(state))
     # 水质恶化叙事反馈
     lines.extend(_water_degrade_lines(state))
+    # 定居者食物不足预警
+    lines.extend(_settler_warn_lines(state))
     # 简短变化描述（只列已解锁物种，归零的不计）
     notable = []
     for name in ("水藻", "水蚤", "鲫鱼", "青蛙", "鲤鱼"):
@@ -3240,7 +3481,7 @@ def _advance(state, days):
                 who = next((n for n in ("翠鸟", "苍鹭") if n in meta["body"]), "定居者")
                 hunt_miss[who] = hunt_miss.get(who, 0) + 1
             elif tag in ("crisis", "disaster", "legend", "achievement",
-                         "discover", "settler", "settler_leave", "report"):
+                         "discover", "settler", "settler_leave", "settler_birth", "report"):
                 key_events.append("第%d天 %s" % (state["turn"], meta["body"]))
         # 决策事件：立即暂停，记录剩余天数
         if state.get("pending_choice"):
@@ -3622,6 +3863,8 @@ def _look_settler(state, s):
         diet = "、".join(s.get("daily_food", {}).keys()) or "—"
     lines.append("  食谱：" + diet)
     lines.append("  定居天数：第 %d 天（寿命上限约 %d 天）" % (s["age"], s.get("max_age", cfg.get("max_age", 0))))
+    if s.get("juvenile"):
+        lines.append("  成长：幼体，还有 %d 天长大（幼体期不自己觅食，由父母代养）" % s.get("juvenile_left", 0))
     lines.append("  当前健康：%s" % _health_word(s["health"]))
     return "\n".join(lines)
 
