@@ -679,6 +679,57 @@ FOLIO_CLUES = {
 }
 
 # ---------------------------------------------------------------------------
+# 2d-bis. 访客图鉴名册
+# ---------------------------------------------------------------------------
+# encyclopedia 的访客段落用：按出场稀有度排序的访客名册。
+# 每项 (显示名, folio_keys)：folio_keys 是判定"已记录"时要在万物志里查的键——
+# 多数访客直接以名字记账；决策类访客记为"X来访 / X定居"；萤火虫记在事件志。
+# 任一键 count > 0 即视为见过该访客。
+VISITOR_DEX = [
+    # 常见
+    ("翠鸟", ["翠鸟", "翠鸟定居", "翠鸟离开"]),
+    ("蝙蝠群", ["蝙蝠群"]),
+    ("流浪猫", ["流浪猫"]),
+    ("池鹭", ["池鹭"]),
+    ("燕子", ["燕子"]),
+    # 少见
+    ("水蛇", ["水蛇来访"]),
+    ("刺猬", ["刺猬"]),
+    ("黄鼠狼", ["黄鼠狼"]),
+    ("白鹭", ["白鹭来访"]),
+    # 稀有
+    ("鹿", ["鹿"]),
+    ("苍鹭", ["苍鹭来访", "苍鹭定居", "苍鹭离开"]),
+    ("流浪乌龟", ["流浪乌龟来访"]),
+    # 传说
+    ("萤火虫大爆发", ["萤火虫大爆发"]),
+    ("水獭", ["水獭来访"]),
+    ("迁徙野鸭群", ["迁徙野鸭群"]),
+    ("仙鹤", ["仙鹤"]),
+]
+
+# 访客谜语传闻：每位访客一条。key 为 VISITOR_DEX 显示名。
+# encyclopedia 每次从"未见过的访客"的谜语里随机抽 3 条作为"——传闻——"展示。
+VISITOR_HINTS = {
+    "翠鸟": "一道影子扎进水里，再升起来时，嘴里多了点什么。",
+    "蝙蝠群": "暮色里，水面上空的飞虫忽然少了。",
+    "流浪猫": "岸边蹲着一个沉默的过客，看了一会儿水，又走了。",
+    "池鹭": "浅水里站着一个耐心的影子，盯着水下的泥里。",
+    "燕子": "贴着水面来，又贴着水面去，快得像一阵风。",
+    "水蛇": "草丛里有什么滑过去了，青蛙忽然不叫了。",
+    "刺猬": "夜里，落叶堆里传来细碎的翻找声。",
+    "黄鼠狼": "一道细长的影子窜过，芦苇跟着晃了。",
+    "白鹭": "比苍鹭小一号的白影子，在浅水里来来回回。",
+    "鹿": "偶尔，会有一个影子俯颈饮水，然后无声离开。",
+    "苍鹭": "它站在水里，久得像一尊雕塑，然后忽然动了。",
+    "流浪乌龟": "你叫不出它的名字，但它每年都会来池塘边看看。",
+    "萤火虫大爆发": "夏夜最静的时候，水面偶尔会映出不该有的光。要有苇丛，要有清水，要在最深的夜色里等。",
+    "水獭": "鱼群最密的那一年，水底会多出一道油亮的影子。它不属于这里，但水够肥，它就来了。",
+    "迁徙野鸭群": "春和秋的天空里，有一些翅膀不是为了池塘停留的。但如果它们降落了，水面会一夜之间变热闹。",
+    "仙鹤": "雾最浓的清晨，水面偶尔会立着一个不该那么高的影子。它不动，你不确定它是不是真的。",
+}
+
+# ---------------------------------------------------------------------------
 # 2e. gaze（凝视）微观描写模板
 # ---------------------------------------------------------------------------
 # 每个条件至少 3 套文案，按 PRNG 随机选，连续 gaze 不会完全重复。后续可持续扩充。
@@ -2419,26 +2470,34 @@ def _settler_hunt(state, s, hunter, events, r):
 
 
 def _consume_food(state, s, food):
-    """从环境/种群扣除一份口粮；任一项不足则 health -0.1。"""
+    """杂食定居者按 daily_food 取食（item 8）：满足任一种即可进食，不会因缺一种就饿死。
+
+    逐项尽量取食（不足则取尽），按"满足比例"折算 health 恢复（最多 +0.1）；
+    只有当全部食物都一无所获时，才算彻底挨饿，health -0.1。
+    """
     pop = state["populations"]
     env = state["env"]
-    short = False
-    for f, amt in food.items():
+    items = [(f, amt) for f, amt in food.items() if amt > 0]
+    if not items:
+        return
+    satisfied = 0.0
+    for f, amt in items:
         if f == "有机碎屑":
-            if env["detritus"] >= amt:
-                env["detritus"] -= amt
-            else:
-                env["detritus"] = 0.0
-                short = True
-            continue
-        have = pop.get(f, 0)
-        if have >= amt:
-            pop[f] = have - amt
+            have = env["detritus"]
+            take = min(have, amt)
+            env["detritus"] = max(0.0, have - take)
         else:
-            pop[f] = 0.0
-            short = True
-    if short:
+            have = pop.get(f, 0)
+            take = min(have, amt)
+            pop[f] = max(0.0, have - take)
+        satisfied += take / amt
+    ratio = satisfied / len(items)
+    if ratio <= 0:
+        # 所有食物都找不到：挨饿掉血
         s["health"] = round(s["health"] - 0.1, 3)
+    else:
+        # 吃到东西：按满足比例恢复体力（缺一两种不致命，只是恢复得少些）
+        s["health"] = round(min(1.0, s["health"] + 0.1 * ratio), 3)
 
 
 def _settler_graze(state, s, events, r):
@@ -3116,10 +3175,18 @@ def _year_report(state, events):
                if sp.get(n, {}).get("extinct_count", 0) >= 1 and pop.get(n, 0) >= 1]
     if revived:
         frags.append("、".join(revived[:3]) + "归零之后又重新出现")
+    # 口径统一：只数 RESIDENT_SPECIES（与 status / 图鉴一致）；
+    # 蚊子、蜻蜓成虫等隐形空中生灵单独注明，避免与面板数字对不上（item 6）
     alive_count = sum(1 for n in RESIDENT_SPECIES if pop.get(n, 0) >= 1)
+    hidden_alive = [n for n, v in SPECIES.items()
+                    if v.get("hidden") and pop.get(n, 0) >= 1]
     body = ("；".join(frags) + "。") if frags else "池塘平静地走过了四季，没有大起大落。"
-    events.append("report:第 %d 年终了。这一年，%s如今池塘里还活跃着 %d 种生灵。"
-                  % (year, body, alive_count))
+    tail = ""
+    if hidden_alive:
+        tail = "（另有 %d 种隐形生灵——%s——在水面之上往来。）" % (
+            len(hidden_alive), "、".join(hidden_alive))
+    events.append("report:第 %d 年终了。这一年，%s如今池塘里还活跃着 %d 种生灵。%s"
+                  % (year, body, alive_count, tail))
 
 
 def _unlock(state, events, name):
@@ -3938,6 +4005,18 @@ def _cmd_status(state):
         seg = "  ".join("%s:%d" % (n, _ipop(state, n)) for n in names) or "（暂无）"
         tail = "  ＋%d 未解锁(???)" % len(locked) if locked else ""
         lines.append("  [%s] %s%s" % (troph_label[troph], seg, tail))
+    # 定居者独立于种群分类（不计入上面的营养级），单列一段，
+    # 免得玩家在"顶级捕食者"里找不到水蛇之类的常驻生灵（item 7）
+    if state.get("settlers"):
+        lines.append("─ 定居者 ─（独立个体，不计入上方种群）")
+        for s in state["settlers"]:
+            if s.get("juvenile"):
+                tag = "幼体"
+            elif s.get("hibernating"):
+                tag = "冬眠中"
+            else:
+                tag = "第%d天" % s["age"]
+            lines.append("  %s · %s · %s" % (s["name"], tag, _health_word(s["health"])))
     # 持续灾害提示
     aw = state.get("active_weather")
     if aw:
@@ -3948,6 +4027,38 @@ def _cmd_status(state):
     lines.append("🌡 池塘评分：%d/100（%s）" % (score, word))
     lines.append(_status_bar(state))
     return "\n".join(lines)
+
+
+def _visitor_seen(state, folio_keys):
+    """判断某访客是否曾被记录：其任一 folio 键在访客志 / 事件志中 count > 0。"""
+    cod = state["folio"]
+    for book in ("visitors", "events"):
+        recs = cod.get(book, {})
+        for k in folio_keys:
+            if recs.get(k, {}).get("count", 0) > 0:
+                return True
+    return False
+
+
+def _visitor_codex_lines(state):
+    """encyclopedia 的访客图鉴段落：已记录 / 未记录 + 未见访客的随机传闻。"""
+    total = len(VISITOR_DEX)
+    recorded = [name for name, keys in VISITOR_DEX if _visitor_seen(state, keys)]
+    unseen = [name for name, keys in VISITOR_DEX if not _visitor_seen(state, keys)]
+    lines = ["🦅 访客（已记录 %d / %d 种）" % (len(recorded), total)]
+    lines.append("  已记录：" + ("、".join(recorded) if recorded else "（还没有访客来过）"))
+    if unseen:
+        lines.append("  未记录：还有 %d 种生灵从未造访过这片池塘。" % len(unseen))
+    # 传闻：从"未见过的访客"的谜语里随机抽 3 条（按当天 turn 取种子，同日多次查看一致）；
+    # 全部访客都见过后，"——传闻——"整体不显示。
+    hint_pool = [VISITOR_HINTS[n] for n in unseen if n in VISITOR_HINTS]
+    if hint_pool:
+        r = Mulberry32(state["turn"])
+        picks = _gaze_sample(r, hint_pool, 3)
+        lines.append("——传闻——")
+        for h in picks:
+            lines.append("「%s」" % h)
+    return lines
 
 
 def _cmd_encyclopedia(state):
@@ -3961,6 +4072,9 @@ def _cmd_encyclopedia(state):
     hidden = len(RESIDENT_SPECIES) - len(appeared)
     if hidden:
         lines.append("  尚未现身：%d 种（??? —— 还在水底的迷雾里等待被发现）" % hidden)
+    lines.append("")
+    # 访客图鉴段落：插在物种图鉴和成就之间
+    lines.extend(_visitor_codex_lines(state))
     lines.append("")
     lines.append("🏆 成就（%d/%d）：" % (len(state["achievements"]), len(ACHIEVEMENTS)))
     for name, cond in ACHIEVEMENTS.items():
