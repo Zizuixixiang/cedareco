@@ -279,6 +279,49 @@ SETTLER_HINTS = {
     "螃蟹": "水底的泥沙总像是刚被翻过，这里一个小坑，那里一堆松土。石缝外面的碎泥比平时多。",
 }
 
+# 定居者猎物全部归零时的一次性预警（补一·2）。猎物恢复后清除标记可再次触发。
+SETTLER_PREY_GONE = {
+    "翠鸟": "翠鸟在枝头偏了又偏头，俯冲了一次，空的。再俯冲，还是空的。它在枯枝上收紧了爪子，喙微微张着，很久没有叫。",
+    "苍鹭": "苍鹭在浅水里换了一个位置，又换了一个。长喙始终没有刺下去。它站在水边，翅膀轻轻抖了一下，像是在忍什么。",
+    "水蛇": "水蛇盘在芦苇根部，头昂着，信子不停地吐。它滑进水里巡了一圈，又空着回来，身体重新盘紧，比平时更紧。",
+    "流浪乌龟": "乌龟爬遍了每一块石头，啃了又啃，石面上再没有啃出干净的灰白。它浮上来换气，停了很久才沉下去。",
+    "野鸭": "野鸭把头埋进水里，很快又抬起来。再埋下去，再抬起来。它们在岸边来来回回地走，喙里总是空的。",
+    "螃蟹": "螃蟹翻遍水底的石头，翻一块，停一下，再翻下一块。钳子举着，却没有东西可以夹。它缩回石缝里，很久没出来。",
+}
+
+# 季节过渡预兆：每季第 29-30 天（换季前两天）在 observe 末尾追加一句（补一·5）。
+# key 为"当前季节"（即将过渡到下一季）。每季 5 条，按回合确定性取用。
+SEASON_OMEN = {
+    "春": [  # 春 → 夏
+        "风不再是凉的了。午后水面蒸起一层薄薄的热气，光变得白了些，照在水上有些晃眼。",
+        "空气里那股湿润的草气淡了，取而代之的是一种闷闷的暖。池塘的呼吸变深了。",
+        "水面上的光从斜斜的一道，变成了直直的一片。正午的时候，水底的石子亮得发白。",
+        "青蛙不再叫了。不是不叫，是改到了傍晚。白天它们躲在阴处，鼓着眼，等热气散。",
+        "水蚤比春天密了一倍。光柱里密密麻麻，跳动的影子挤在一起，像是水自己在沸腾。",
+    ],
+    "夏": [  # 夏 → 秋
+        "傍晚的风擦过水面，带着一丝说不清的凉。蝉声还是响的，但有一片黄叶从芦苇丛上飘了下来。",
+        "光的角度变了。午后的光不再是直直砸下来的，而是斜斜地铺开，颜色暖了一层。",
+        "蝉声稀了。前几天还响成一片，现在东一声西一声，中间隔着长长的沉默。",
+        "水色转深了。夏天那种亮晃晃的浅绿褪了，变成一种沉静的墨绿，像是在收着什么。",
+        "燕子贴着水面掠过的次数少了。有一天一只也没来，水面空空荡荡，只有风在上面画纹。",
+    ],
+    "秋": [  # 秋 → 冬
+        "风不再是凉的了，是冷的。水面被吹得起了一层细密的疙瘩，芦苇瑟瑟地抖着，穗子快掉光了。",
+        "早晨水边凝了一层薄薄的冰碴，太阳出来就化了，但化得比昨天慢了。空气里有了冬天的味道。",
+        "最后一批黄叶落尽了。芦苇光秃秃地立着，风从它们中间穿过去，声音比有叶子的时候更尖。",
+        "鱼沉得很深。水面上的动静越来越少，偶尔一串气泡冒上来，也很快碎了。",
+        "傍晚来得快了。刚才还是亮的，一转头天就暗了，池塘早早地沉进了灰色里。",
+    ],
+    "冬": [  # 冬 → 春
+        "冰层下面有什么在动。一道暗影缓缓划过，水面荡开一圈谁也看不见的涟漪。冰沿上滴下了一滴水。",
+        "风里的刺骨淡了。空气里有了一股泥土的味道，湿湿的，沉沉的。冰还没化，但已经在想化的事了。",
+        "中午的冰面亮了一下，边缘渗出一小摊水。到了傍晚又冻上了，但冻得比昨天薄。",
+        "水底有东西在翻身。淤泥上多了几道新拖过的痕迹，不知道是谁，在试着动。",
+        "一只水蚤在冰层下弹了一下。又弹了一下。然后不动了。但它弹过了。",
+    ],
+}
+
 # 定居者叙事文案（到来 / 饥饿离开 / 年迈离开 + 各自的年鉴记录）
 SETTLER_TEXT = {
     "流浪乌龟": {
@@ -1308,6 +1351,10 @@ def fresh_state(seed):
         "hibernate": {},              # 冬眠暂存：物种 -> 冬眠前数量（春季恢复）
         "diseases": {},               # 进行中疫病：物种 -> {"elapsed","duration"}
         "disease_immune": {},         # 疫病免疫：物种 -> 免疫截止回合
+        # 补一：趋势/变化量
+        "prev_env": None,             # 上一天的 DO/营养盐/碎屑（status 趋势箭头用）
+        "last_delta": {},             # 上一 tick 各物种变化量（observe JSON delta）
+        "history": [],                # 最近 30 天快照（trends 折线图）
     }
 
 
@@ -1378,6 +1425,10 @@ def _migrate(state):
     state.setdefault("hibernate", {})
     state.setdefault("diseases", {})
     state.setdefault("disease_immune", {})
+    # 补一：趋势/变化量字段
+    state.setdefault("prev_env", None)
+    state.setdefault("last_delta", {})
+    state.setdefault("history", [])
 
 
 def rng_from(state):
@@ -1932,6 +1983,14 @@ def tick(state):
     pop = state["populations"]
     env = state["env"]
 
+    # 推进前快照：供本轮 delta（补一·4）与 status 趋势箭头（补一·1）
+    _prev_pop = {n: pop.get(n, 0.0) for n in RESIDENT_SPECIES}
+    state["prev_env"] = {
+        "dissolved_oxygen": env["dissolved_oxygen"],
+        "nutrients": env["nutrients"],
+        "detritus": env["detritus"],
+    }
+
     state["turn"] += 1
     turn = state["turn"]
     season = season_of(turn)
@@ -2261,6 +2320,24 @@ def tick(state):
     else:
         state["flags"]["days_no_extinction"] += 1
 
+    # 本轮各物种变化量（补一·4，只记非零）
+    state["last_delta"] = {
+        n: int(round(pop[n] - _prev_pop.get(n, 0.0)))
+        for n in RESIDENT_SPECIES
+        if int(round(pop[n] - _prev_pop.get(n, 0.0))) != 0
+    }
+    # 历史快照，最多保留 30 天（补一·7）
+    hist = state.setdefault("history", [])
+    hist.append({
+        "turn": turn,
+        "pop": {n: int(round(pop[n])) for n in RESIDENT_SPECIES if pop[n] >= 1},
+        "DO": round(env["dissolved_oxygen"], 1),
+        "nutrients": round(env["nutrients"], 0),
+        "detritus": round(env["detritus"], 0),
+    })
+    if len(hist) > 30:
+        del hist[:len(hist) - 30]
+
     state["log"] = events
     commit_rng(state, r)
     return events
@@ -2526,7 +2603,7 @@ def _natural_recovery(state, events, r):
 def _new_settler_dict(name, juvenile=False):
     t = SETTLER_TYPES[name]
     return {
-        "name": name, "age": 0, "health": 1.0,
+        "name": name, "nickname": None, "age": 0, "health": 1.0,
         "max_age": t["max_age"], "daily_food": dict(t.get("daily_food", {})),
         "since_hunt": 0,            # 距上次成功捕食的天数（hunter 用）
         "juvenile": juvenile,       # 是否幼体（不自己捕食，靠父母代偿）
@@ -3447,6 +3524,23 @@ def _health_word(h):
     return "危急"
 
 
+def _settler_label(s):
+    """定居者显示名（补一·6）：有昵称显示"小蓝（翠鸟）"，否则只显示物种名。"""
+    nick = s.get("nickname")
+    return "%s（%s）" % (nick, s["name"]) if nick else s["name"]
+
+
+def _trend_arrow(cur, prev, eps=0.05):
+    """环境指标趋势箭头（补一·1）：与上一天对比。"""
+    if prev is None:
+        return "—"
+    if cur - prev > eps:
+        return "↑"
+    if prev - cur > eps:
+        return "↓"
+    return "—"
+
+
 def _pond_score(state):
     """池塘综合评分（0~100）+ 定性描述。六个维度按权重加权（item F1）。"""
     pop = state["populations"]
@@ -3533,9 +3627,12 @@ def _status_bar(state):
         # 含所有已解锁物种（包括归零的，AI 需知道哪些物种没了）；未解锁的不出现（item 1/8 / 二轮#8）
         "pop": {n: int(round(pop.get(n, 0))) for n in RESIDENT_SPECIES
                 if n in _unlocked_set(state)},
+        # 本轮各物种变化量，只含非零（补一·4）
+        "delta": dict(state.get("last_delta", {})),
         "unlocked": list(state.get("unlocked_species", [])),
-        # observe 的 JSON 保留定居者精确健康数值（item 29）；juvenile 标记幼体
-        "settlers": [{"name": s["name"], "health": round(s["health"], 3),
+        # observe 的 JSON 保留定居者精确健康数值（item 29）；juvenile 标记幼体；nickname 昵称
+        "settlers": [{"name": s["name"], "nickname": s.get("nickname"),
+                      "health": round(s["health"], 3),
                       "age": s["age"], "juvenile": s.get("juvenile", False)}
                      for s in state.get("settlers", [])],
         "pending_choice": bool(pc),
@@ -3799,6 +3896,49 @@ def _settler_warn_lines(state):
     return out
 
 
+def _settler_prey(name, s):
+    """定居者的猎物/食物物种列表（剔除环境来源如有机碎屑）。"""
+    cfg = SETTLER_TYPES.get(name, {})
+    if cfg.get("hunter"):
+        return list(cfg["hunter"]["prey"])
+    food = s.get("daily_food") or cfg.get("daily_food", {})
+    return [k for k in food if k != "有机碎屑"]
+
+
+def _settler_prey_gone_lines(state):
+    """定居者猎物全部归零时的一次性预警（补一·2），猎物恢复后清除标记。"""
+    flags = state["flags"]
+    pop = state["populations"]
+    out = []
+    for s in state.get("settlers", []):
+        name = s["name"]
+        if name not in SETTLER_PREY_GONE:
+            continue
+        prey = _settler_prey(name, s)
+        if not prey:
+            continue
+        all_gone = all(pop.get(p, 0) < 1 for p in prey)
+        flag = "prey_gone_%s" % name
+        if all_gone:
+            if not flags.get(flag):
+                out.append("· " + SETTLER_PREY_GONE[name])
+                flags[flag] = True
+        elif flags.get(flag):
+            flags[flag] = False
+    return out
+
+
+def _season_omen_line(state):
+    """换季前两天（每季第 29-30 天）追加一句季节预兆（补一·5）。"""
+    turn = state["turn"]
+    if turn <= 0 or (turn % SEASON_LEN) not in (28, 29):
+        return None
+    omens = SEASON_OMEN.get(state["season"])
+    if not omens:
+        return None
+    return "· " + _pick_t(state, omens)
+
+
 def _water_degrade_lines(state):
     """水质恶化的简短叙事反馈（item 16），与 gaze 环境描写对齐但更短。"""
     env = state["env"]
@@ -3826,6 +3966,8 @@ def _observe_text(state, events):
     lines.extend(_water_degrade_lines(state))
     # 定居者食物不足预警
     lines.extend(_settler_warn_lines(state))
+    # 定居者猎物归零预警（补一·2）
+    lines.extend(_settler_prey_gone_lines(state))
     # 简短变化描述（只列已解锁物种，归零的不计）
     notable = []
     for name in ("水藻", "水蚤", "鲫鱼", "青蛙", "鲤鱼"):
@@ -3842,6 +3984,10 @@ def _observe_text(state, events):
     if state["turn"] > 0 and state["turn"] % 30 == 0:
         lines.append("· 造物主已走过 %d 天，解锁 %d/%d 个成就。输入 export 可保存进度。"
                      % (state["turn"], len(state["achievements"]), len(ACHIEVEMENTS)))
+    # 季节过渡预兆（换季前两天，补一·5）
+    omen = _season_omen_line(state)
+    if omen:
+        lines.append(omen)
     # 定居者延迟因果暗示（定居满 N 天的一次性描写）
     lines.extend(_settler_hint_lines(state))
     # 冬季玩法延迟反馈（凿冰洞 / 落叶床，一次性）
@@ -3926,6 +4072,7 @@ PENDING_OK_VERBS = (
     "chronicle", "年鉴", "look", "查看", "gaze", "凝视", "注视",
     "encyclopedia", "图鉴", "new", "reset", "新游戏", "重开",
     "export", "导出", "import_save", "import", "导入",
+    "trends", "趋势", "name", "取名", "命名",
 )
 
 
@@ -3984,6 +4131,10 @@ def _exec_one(state, part):
         return _cmd_encyclopedia(state)
     if verb in ("look", "查看"):
         return _cmd_look(state, args)
+    if verb in ("trends", "趋势"):
+        return _cmd_trends(state)
+    if verb in ("name", "取名", "命名"):
+        return _cmd_name(state, args)
     if verb in ("new", "reset", "新游戏", "重开"):
         seed = int(args[0]) if args and args[0].lstrip("-").isdigit() else 12345
         new_game(seed)
@@ -4349,8 +4500,14 @@ def _cmd_status(state):
     lines = ["═══ 详细状态面板 ═══"]
     lines.append("第 %d 天 · %s季 · 第 %d 年" % (state["turn"], state["season"], state["turn"] // YEAR_LEN + 1))
     lines.append("─ 环境参数 ─")
-    lines.append("  水温 %.1f℃ | 溶氧 %.1f mg/L | 光照 %.2f" % (env["water_temp"], env["dissolved_oxygen"], env["light"]))
-    lines.append("  营养盐 %.0f | 有机碎屑 %.0f | 浑浊度 %.2f" % (env["nutrients"], env["detritus"], env["turbidity"]))
+    pe = state.get("prev_env") or {}
+    do_a = _trend_arrow(env["dissolved_oxygen"], pe.get("dissolved_oxygen"))
+    nu_a = _trend_arrow(env["nutrients"], pe.get("nutrients"), eps=0.5)
+    de_a = _trend_arrow(env["detritus"], pe.get("detritus"), eps=0.5)
+    lines.append("  水温 %.1f℃ | 溶氧 %.1f %s mg/L | 光照 %.2f"
+                 % (env["water_temp"], env["dissolved_oxygen"], do_a, env["light"]))
+    lines.append("  营养盐 %.0f %s | 有机碎屑 %.0f %s | 浑浊度 %.2f"
+                 % (env["nutrients"], nu_a, env["detritus"], de_a, env["turbidity"]))
     lines.append("─ 种群数量 ─（仅显示已解锁物种）")
     unlocked = _unlocked_set(state)
     by_troph = {}
@@ -4375,7 +4532,7 @@ def _cmd_status(state):
                 tag = "冬眠中"
             else:
                 tag = "第%d天" % s["age"]
-            lines.append("  %s · %s · %s" % (s["name"], tag, _health_word(s["health"])))
+            lines.append("  %s · %s · %s" % (_settler_label(s), tag, _health_word(s["health"])))
     # 持续灾害提示
     aw = state.get("active_weather")
     if aw:
@@ -4481,7 +4638,7 @@ def _cmd_folio(state):
             if here:
                 # 当前在塘：用定性词描述健康（item 29）
                 state_word = "（当前在塘 · %s）" % "、".join(
-                    "%s第%d天%s" % (name, s["age"], _health_word(s["health"])) for s in here)
+                    "%s第%d天%s" % (_settler_label(s), s["age"], _health_word(s["health"])) for s in here)
             else:
                 state_word = ""
             lines.append("  【%s】定居 %d 次 · 最长存活 %d 天%s" % (
@@ -4598,7 +4755,7 @@ def _look_settler(state, s):
     """look 一名定居者：习性、食谱、定居天数、当前健康（item 30）。"""
     name = s["name"]
     cfg = SETTLER_TYPES.get(name, {})
-    lines = ["【%s】定居者" % name]
+    lines = ["【%s】定居者" % _settler_label(s)]
     if name in SETTLER_HABIT:
         lines.append("  " + SETTLER_HABIT[name])
     if cfg.get("hunter"):
@@ -4613,9 +4770,29 @@ def _look_settler(state, s):
     return "\n".join(lines)
 
 
+def _look_visitor(state, key):
+    """look 一个访客名：从访客志/事件志里查来访次数与行为记录（补一·3）。"""
+    cod = state.get("folio", {})
+    matches = []
+    for book in ("visitors", "events"):
+        for k, rec in cod.get(book, {}).items():
+            if rec.get("count", 0) >= 1 and (key in k or k in key):
+                matches.append((k, rec))
+    if not matches:
+        return None
+    lines = []
+    for k, rec in matches:
+        line = "【%s】访客 · 来访 %d 次" % (k, rec.get("count", 0))
+        note = "；".join(rec.get("notes", [])[:3])
+        if note:
+            line += "\n  行为：" + note
+        lines.append(line)
+    return "\n".join(lines)
+
+
 def _cmd_look(state, args):
     if not args:
-        return "用法：look [物种/季节/定居者]"
+        return "用法：look [物种/季节/定居者/访客]"
     key = args[0].strip()
     # 定居者优先（翠鸟/苍鹭等可能与访客同名，在塘的以定居者身份展示）
     for s in state.get("settlers", []):
@@ -4628,6 +4805,10 @@ def _cmd_look(state, args):
         return "【%s】%s\n  基准水温 %d℃，基准光照 %.2f" % (skey, e["desc"], e["water_temp"], e["light"])
     name = _resolve_species(key)
     if name is None:
+        # 物种查不到：尝试当作访客名查访客志（补一·3）
+        vis = _look_visitor(state, key)
+        if vis:
+            return vis
         return "图鉴里没有「%s」。" % key
     sp = SPECIES[name]
     troph_label = {"producer": "生产者", "primary": "初级消费者",
@@ -4732,8 +4913,11 @@ def _restore_from_lite(data):
 
 
 def _cmd_export(state, args):
-    """导出存档为 base64 字符串。export lite 只导核心状态 + folio 摘要。"""
-    lite = bool(args) and args[0].lower() in ("lite", "精简")
+    """导出存档为 base64 字符串。export lite 只导核心状态 + folio 摘要；export story 导年度故事。"""
+    mode = args[0].lower() if args else ""
+    if mode in ("story", "故事", "编年史"):
+        return _export_story(state)
+    lite = mode in ("lite", "精简")
     data = _lite_snapshot(state) if lite else state
     raw = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
     b64 = base64.b64encode(raw.encode("utf-8")).decode("ascii")
@@ -4770,6 +4954,92 @@ def _cmd_import(state, args):
         "（精简存档仅保留关键事件年鉴）" if is_lite else "")
 
 
+def _cmd_name(state, args):
+    """给定居者取名（补一·6）：name [定居者/旧昵称] [新昵称]。"""
+    if len(args) < 2:
+        return "用法：name [定居者] [昵称]，例如 name 翠鸟 小蓝"
+    target = args[0].strip()
+    nick = " ".join(args[1:]).strip()
+    settlers = state.get("settlers", [])
+    # 优先匹配现有昵称，其次物种名
+    cand = [s for s in settlers if s.get("nickname") == target]
+    if not cand:
+        cand = [s for s in settlers if s["name"] == target]
+    if not cand:
+        return "池塘里没有叫「%s」的定居者。（status 可查看在塘定居者）" % target
+    # 多只同种：取第一只还没有昵称的，否则第一只
+    s = next((x for x in cand if not x.get("nickname")), cand[0])
+    s["nickname"] = nick
+    return "🏷 从此，这只%s有了名字：%s。" % (s["name"], _settler_label(s))
+
+
+_SPARK = "▁▂▃▄▅▆▇█"
+
+
+def _spark(values):
+    """把一串数值压成单行 ASCII 折线（八级块字符）。"""
+    if not values:
+        return ""
+    lo, hi = min(values), max(values)
+    if hi - lo < 1e-9:
+        return _SPARK[3] * len(values)
+    out = []
+    for v in values:
+        idx = int((v - lo) / (hi - lo) * (len(_SPARK) - 1) + 0.5)
+        out.append(_SPARK[idx])
+    return "".join(out)
+
+
+def _cmd_trends(state):
+    """近 30 天趋势折线图（补一·7）：物种总量 / 溶氧 / 营养盐。"""
+    hist = state.get("history", [])
+    if len(hist) < 2:
+        return "📈 趋势数据还不足（至少需要 2 天，先 observe 或 wait 几天）。"
+    recent = hist[-30:]
+    totals = [sum(h.get("pop", {}).values()) for h in recent]
+    dos = [h.get("DO", 0) for h in recent]
+    nuts = [h.get("nutrients", 0) for h in recent]
+    d0, d1 = recent[0]["turn"], recent[-1]["turn"]
+    lines = ["📈 近 %d 天趋势（第 %d→%d 天）" % (len(recent), d0, d1)]
+
+    def row(label, vals, fmt):
+        return "  %s %s  %s→%s（峰值 %s）" % (
+            label, _spark(vals), fmt(vals[0]), fmt(vals[-1]), fmt(max(vals)))
+    lines.append(row("物种总量", totals, lambda v: "%d" % v))
+    lines.append(row("溶  氧 ", dos, lambda v: "%.1f" % v))
+    lines.append(row("营养盐 ", nuts, lambda v: "%.0f" % v))
+    return "\n".join(lines)
+
+
+def _export_story(state):
+    """把年鉴包装成 markdown 编年史（补一·8）：按"年·季"分段串联。"""
+    ch = state.get("chronicle", [])
+    if not ch:
+        return "# 池塘编年史\n\n（这片池塘还没有故事。先 observe、summon，让生命登场。）"
+    lines = ["# 池塘编年史", "",
+             "> 第 %d 天 · %s · 共 %d 条记事" % (state["turn"], state["season"], len(ch)), ""]
+    cur_key = None
+    for entry in ch:
+        m = re.match(r"^(.) 第(\d+)天：(.*)$", entry)
+        if m:
+            season, day, body = m.group(1), int(m.group(2)), m.group(3)
+            year = (day - 1) // YEAR_LEN + 1
+        else:
+            season, day, body, year = None, None, entry, None
+        key = (year, season)
+        if key != cur_key:
+            cur_key = key
+            if season:
+                lines.append("")
+                lines.append("## 第 %d 年 · %s" % (year, season))
+                lines.append("")
+        if day:
+            lines.append("第 %d 天，%s" % (day, body))
+        else:
+            lines.append(body)
+    return "\n".join(lines)
+
+
 def _help_text():
     return (
         "🌊 池塘生态 · 造物主可用的力量\n"
@@ -4787,8 +5057,10 @@ def _help_text():
         "  folio            万物志（物种/定居者/访客/事件）。\n"
         "  chronicle [all]  年鉴时间线（默认最近 20 条）。\n"
         "  encyclopedia     图鉴与成就。\n"
-        "  look 物种/季节   查看详细信息。\n"
-        "  export [lite]    导出存档为 base64（lite 为精简版）。\n"
+        "  look 物种/季节/访客 查看详细信息。\n"
+        "  trends           近 30 天趋势折线图（物种总量/溶氧/营养盐）。\n"
+        "  name 定居者 昵称 给定居者取名（如 name 翠鸟 小蓝）。\n"
+        "  export [lite|story] 导出存档为 base64（lite 精简版 / story 年度故事）。\n"
         "  import_save 串   从 base64 字符串恢复存档。\n"
         "  new [seed]       重开一局。\n"
         "  支持分号批量：summon 水藻 50; summon 水蚤 30; wait 7"
