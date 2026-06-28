@@ -246,7 +246,7 @@ SETTLER_TYPES = {
     # daily_food 中的 "有机碎屑" 特殊处理：从环境 detritus 扣除
     "螃蟹": {"max_age": 120, "daily_food": {"田螺": 1, "河蚌": 0.5, "有机碎屑": 2},
             "turbidity_per_day": 0.01, "juvenile_days": 20, "max_count": 6},
-    "水蛇": {"max_age": 150, "daily_food": {"鲫鱼": 1, "青蛙": 0.5},
+    "水蛇": {"max_age": 150, "daily_food": {"鲫鱼": 1, "青蛙": 0.5, "田鼠": 0.5},
             "juvenile_days": 15, "max_count": 6},
     "野鸭": {"max_age": 180, "daily_food": {"浮萍": 3, "孑孓": 2},
             "detritus_per_day": 2.0, "nutrients_per_day": 1.0,
@@ -2758,7 +2758,11 @@ def _process_settlers(state, events, r):
                 s["juvenile"] = False
                 grown = SETTLER_GROWN.get(name)
                 if grown:
-                    events.append("settler_birth:" + _pick(r, grown))
+                    pool = grown
+                    # 翠鸟幼体"叼着鲫鱼"文案需池塘有鱼，否则改用其他成长文案（补#6）
+                    if name == "翠鸟" and state["populations"].get("鲫鱼", 0) < 1:
+                        pool = [t for t in grown if "鲫鱼" not in t] or grown
+                    events.append("settler_birth:" + _pick(r, pool))
                 _chronicle(state, SETTLER_GROWN_CHRON % name)
         # 摄食
         if s.get("juvenile"):
@@ -2994,10 +2998,15 @@ def _resolve_choice(state, pc, idx, events):
         state["flags"]["water_bloom_done"] = True
         _unlock(state, events, "水华危机")
         if idx == 1:
+            had_algae = pop.get("水藻", 0) >= 1     # 文案动态化（补#3）
             pop["水藻"] *= 0.4
             pop["水蚤"] *= 0.6
             env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] + 1)
-            msg = "你捞走大片绿藻，水面重新见了光。但清理带走了不少微小的生命。"
+            env["nutrients"] *= 0.7                  # 换水带走部分营养盐，与 clean 一致（补#2）
+            if had_algae:
+                msg = "你捞走大片绿藻，水面重新见了光。但清理带走了不少微小的生命。"
+            else:
+                msg = "你清理了水面的黏稠物质，水面重新见了光。"
         else:
             env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - 2)
             msg = "你没有动手。几天后，浮萍和睡莲的叶开始挤压绿藻的空间，水面慢慢被撕开几道缝隙。"
@@ -3122,7 +3131,8 @@ def _random_events(state, events, r, season):
     snake_ok = season != "冬"
     if snake_ok and vis(0.03):  # 蛇 —— 决策
         r.randint(1, 2)  # 维持随机流对齐（原立即效果在此消耗一次抽样）
-        if can_choose() and _choice_ready(state, "蛇"):
+        # 已有水蛇定居者时不再触发收留决策（仍消耗随机数保持流对齐，补#4）
+        if not _has_settler(state, "水蛇") and can_choose() and _choice_ready(state, "蛇"):
             _trigger_choice(state, events, "蛇")
     if vis(0.03):
         # 刺猬：明确捕食水黾 -2~3（item 七）
@@ -3243,12 +3253,13 @@ def _random_events(state, events, r, season):
     # 暴雨后 waterbloom_x2 加成生效时各概率翻倍。
     bloom_x2 = 2 if _chain_active(state, "waterbloom_x2") else 1
     bloom_hit = False
-    if (_chain_active(state, "heatwave")
+    has_algae = pop.get("水藻", 0) >= 50          # 没有藻不该触发水华（补#1）
+    if (has_algae and _chain_active(state, "heatwave")
             and (env["nutrients"] > 60 or env["detritus"] > 50)):
         bloom_hit = bloom_hit or vis(0.3 * bloom_x2)
-    if season == "夏" and env["nutrients"] > 120:
+    if has_algae and season == "夏" and env["nutrients"] > 120:
         bloom_hit = bloom_hit or vis(0.15 * bloom_x2)
-    if pop.get("水藻", 0) > 800 and env["nutrients"] > 80:
+    if has_algae and pop.get("水藻", 0) > 800 and env["nutrients"] > 80:
         bloom_hit = bloom_hit or vis(0.2 * bloom_x2)
     if bloom_hit and can_choose() and _choice_ready(state, "水华"):
         _trigger_choice(state, events, "水华")
