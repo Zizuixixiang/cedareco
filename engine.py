@@ -619,9 +619,9 @@ CHOICE_COOLDOWN = 10
 CHOICE_GLOBAL_COOLDOWN = 3
 
 # ---------------------------------------------------------------------------
-# 2d. 造物名册发现制（解锁条件 + 叙述）
+# 2d. 造物名册解锁制（解锁条件 + 叙述）
 # ---------------------------------------------------------------------------
-# 每项：(物种, 条件函数(state)->bool, 发现叙述)
+# 每项：(物种, 条件函数(state)->bool, 解锁叙述)
 # 条件用历史最大值字典 max_seen 判断"曾经超过"，不会回退。
 
 STARTER_SPECIES = ["水藻", "浮萍", "芦苇"]
@@ -650,7 +650,7 @@ def _discovery_rules():
          "芦苇间多出几条细细的通道，草茎被压弯又弹回。"),
         ("鲤鱼", lambda s: maxs(s, "鲫鱼") > 30,
          "深水里荡开一圈涟漪，宽大、缓慢，底下有什么在转身。"),
-        # ---- V1.0 扩展：新增 7 种发现规则 ----
+        # ---- V1.0 扩展：新增 7 种解锁规则 ----
         ("泥鳅", lambda s: maxs(s, "有机碎屑") > 40,
          "水底一团浑雾散去，泥里钻出几条滑溜溜的影子，又钻进另一片浑雾里。"),
         ("淡水虾", lambda s: s["populations"].get("田螺", 0) > 20
@@ -675,7 +675,7 @@ def _discovery_rules():
 
 DISCOVERY_RULES = _discovery_rules()
 
-# folio 中未发现物种的模糊线索（不直白）
+# folio 中未解锁物种的模糊线索（不直白）
 FOLIO_CLUES = {
     "水蚤": "水里的绿意足够浓时，它们才会现身。",
     "田螺": "身负重壳，贴着水底行走。",
@@ -1010,36 +1010,53 @@ OBSERVE_AMBIENT = {
         "浮萍铺满了水面。光从几处缝隙漏下去，在水底投下细碎的光斑，其余都是暗的。",
         "绿毯把水面封死了。看不见鱼，看不见底，浮萍在微风里轻轻挤着，发出细小的摩擦声。",
         "浮萍厚厚地压着，风也推不开。水底闷得发不出声，偶尔一串气泡从缝隙里钻上来，又碎了。",
+        "浮萍密到连水都看不见了。偶尔有鱼顶了一下浮萍，绿毯鼓起一个小包，又慢慢平下去。",
+        "绿色的覆盖从岸边一直铺到对岸，水面彻底消失了。只有风吹过时，浮萍的缝隙里才露出一线深色的水。",
     ],
     "low_do": [
         "水面上浮着一层细密的气泡，久久不散。几条鲫鱼把嘴探出来，急促地张合。",
         "水底积着一口吐不出的浊气。水草软软地垂着，田螺缩进壳里，一动不动。",
         "池塘闷住了。连水蚤都挤到了近水面，密密麻麻，在那一层薄薄的氧气里争着喘息。",
+        "水底暗沉沉的，连水藻都不怎么冒气泡了。鱼群浮在近水面，鳍划得很慢，像是在稠稠的液体里搅动。",
+        "池塘的呼吸越来越浅。水面那一层气泡聚了又散，散了又聚，底下的生命在一点一点往上挤。",
     ],
     "high_nutrients": [
         "水色发绿，浓得有些黏稠。光只穿得进一半，水底的一切都模糊了轮廓。",
         "水藻疯长，绿丝缠成一团一团，在水里轻轻拉扯，像在争抢最后的光。",
         "池水绿得不正常，空气里浮着一股生腥气。水草上挂满了黏糊糊的绿絮，随波晃着。",
+        "水藻的绿浓得发暗，不再是翠的，而是一种沉甸甸的墨绿。它们在水中膨胀，挤占了所有能挤的空间。",
+        "水草上挂满了黏糊糊的绿絮，越长越长，随波晃荡。有几缕从茎上断开，慢慢漂向更浑的地方。",
     ],
     "high_detritus": [
         "水底积着一层厚厚的腐叶，踩上去会陷下去。腐气从淤泥里往上冒，在水面碎成细密的气泡。",
         "池底黏糊糊的，碎屑堆成了团。水蚯蚓在底下蠕动，密密麻麻的红丝时隐时现。",
         "水面漂着碎叶和半腐的草茎，水色发黄。稍一搅动，沉底的碎屑就翻上来，水更浑了。",
+        "池底积了厚厚一层腐叶，水蚯蚓在里面钻来钻去，把碎屑拱得不停翻动。泥面上密密麻麻全是它们扭动的红丝。",
+        "水面不时冒出一串气泡，带着腐泥的味道。碎屑在水底慢慢分解，释放出看不见的东西。",
     ],
     "biodiverse": [
         "池塘从来没有这样挤过。从水底到水面，每一层都有生命在忙自己的事。",
         "鱼群在水草间穿梭，田螺在石面上缓缓爬过，岸边草丛里窸窣作响。池塘活了。",
         "眼睛不知道该往哪里放。水蚤在光柱里跳动，远处野鸭划开水面，到处都有动静。",
+        "水黾在水面压出一圈圈细纹，鲫鱼在中间水层穿梭，田螺在水底慢慢犁过石头。池塘的每一层都有人值班。",
+        "青蛙蹲在睡莲叶上叫了一声，蜻蜓从芦苇尖上弹出去，翠鸟在枯枝上偏了偏头。到处都有眼睛盯着水面，到处都有影子在被盯。",
+        "食物链一刻不停地转着。水蚤啃水藻，鲫鱼追水蚤，鲤鱼在深处等它的那份。一环咬着另一环，谁也没闲着。",
     ],
     "settler": [
         "乌龟趴在那块老石头上，闭着眼。周围的喧嚣跟它没关系，它一动不动。",
         "枯枝上蹲着那道蓝影。翠鸟守着池塘，像守着自己的领地，很久了。",
         "苍鹭站在浅水里，长颈微曲。它不动，整个池塘的时间都跟着慢了半拍。",
+        "芦苇丛里静得不太对劲。水蛇盘在根部，青蛙都绕到对岸去了，田鼠也不敢从那片苇根旁边过。",
+        "野鸭并排划过水面，身后两道波纹渐渐合成一片。它们游过的地方，浮萍缺了几块，边缘参差。",
+        "螃蟹在水底横着走，大钳子拖过泥沙，留下一道歪歪的痕。石缝外面堆着新挖出来的碎泥，一小堆一小堆。",
     ],
     "default": [
         "水面平静，光线在水底缓缓移动。一切都按着自己的节奏，不快不慢。",
         "池塘安静地呼吸着。没有大事发生，细小的生命在各自的角落里忙着。",
         "天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地转着。",
+        "池塘没有什么特别的事。水蚤在光柱里跳，田螺在石头上爬，一切和昨天差不多，大概明天也一样。",
+        "风轻轻推了一下水面，涟漪从东岸荡到西岸，碰到岸边又荡回来。鱼在水草间打了个转，又游回原来的位置。",
+        "天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地转着。今天没有大事发生，这就很好。",
     ],
 }
 
@@ -1256,7 +1273,7 @@ def fresh_state(seed):
             "days_no_extinction": 0,
             "days_no_intervention": 0,
             "turtle_resident": False,
-            # V1.0 扩展：发现制/成就所需的连续天数与历史标记
+            # V1.0 扩展：解锁制/成就所需的连续天数与历史标记
             "clear_streak": 0,           # 连续清水稳定天数（浊度<0.2 且溶氧>4）
             "clear_ever": False,         # 浑浊度是否曾经 < 0.15
             "lily_streak": 0,            # 浮萍与水藻同时存活的连续天数
@@ -1268,13 +1285,16 @@ def fresh_state(seed):
             "had_lily": False,           # 是否曾有过睡莲（来年春季可恢复）
             "lily_bloom_year": -1,       # 上次睡莲开花的年份（每年一次）
             "do_alerted": False,         # 溶氧危机是否已提示（去重）
+            # 冬季玩法（春季重置）
+            "crack_count": 0,            # 本冬已凿冰洞次数（上限 3）
+            "shelter_used": False,       # 本冬是否已铺落叶床
         },
         "log": [],                   # 最近一回合的事件列表
         "pending_pause": None,       # wait 自动暂停原因
-        # ---- v4：三层架构 / 发现制 / 万物志 / 年鉴 ----
+        # ---- v4：三层架构 / 解锁制 / 万物志 / 年鉴 ----
         "settlers": [],              # 定居者列表（个体）
         "unlocked_species": list(STARTER_SPECIES),   # 已解锁可召唤物种
-        "max_seen": {},              # 各物种/碎屑历史最大值（发现制判定）
+        "max_seen": {},              # 各物种/碎屑历史最大值（解锁制判定）
         "folio": {                   # 万物志四本
             "species": {},           # 物种志：name -> {first_day, first_season, extinct_count, alive}
             "settlers": {},          # 定居者志：name -> {times, max_days}
@@ -1543,17 +1563,93 @@ def _season_birth_factor(state, name, season):
     return f
 
 
-def _season_death_factor(name, season, turn):
-    """季节死亡系数（浮萍/蝌蚪冬季高死亡，睡莲秋末加速枯萎）。"""
+def _season_death_factor(state, name, season, turn):
+    """季节死亡系数（浮萍/蝌蚪冬季高死亡，睡莲秋末加速枯萎）。
+
+    落叶床（shelter）生效期间，越冬底栖者（田螺/水蚯蚓/泥鳅）冬季死亡率降低 30%。
+    """
     f = 1.0
     if season == "冬":
         if name == "浮萍":
             f *= 3.0
         if name == "蝌蚪":
             f *= 3.0                    # 蝌蚪几乎活不过冬天
+        # 落叶床庇护：底栖越冬者死亡率 -30%（chain "shelter" active 时）
+        if name in SHELTER_PROTECTED and _chain_active(state, "shelter"):
+            f *= 0.7
     elif season == "秋" and name == "睡莲" and _year_day(turn) >= 76:
         f *= 2.0                        # 秋季后半段睡莲枯萎开始
     return f
+
+
+# 落叶床庇护的越冬底栖物种
+SHELTER_PROTECTED = ("田螺", "水蚯蚓", "泥鳅")
+
+# 冬季专属玩法文案 ----------------------------------------------------------
+# crack（凿冰洞）：操作当天文案 + 2~3 天后的一次性延迟反馈
+CRACK_ACTION = {
+    "op": [
+        "你凿穿了冰面。一声闷响，碎冰塌进水里，露出一个深色的洞口。冷空气猛地灌了进去。",
+        "冰层裂开，一块碎冰翻转着沉下去。洞口的水面在冷空气里冒着白气，像池塘在呼出一口憋了很久的气。",
+        "凿子破开冰面，光线从洞口直直灌进去，在水底投下一柱晃动的光。底下的影子们动了动。",
+    ],
+    "hint": [
+        "几天前凿开的冰洞又结了一层薄冰，比周围的冰更透明，像一扇小窗。光从那里照下去，水底多了一小块亮处。",
+        "冰洞口的水面上浮着几片碎冰，轻轻碰在一起又分开。洞口周围的水比之前清了一点，底下的泥鳅往这边挪了挪。",
+        "那个凿开的洞还在，边缘结了新的冰凌，一圈一圈往里收。水面在那里露着一小块，天光漏下去，照着底下缓慢移动的螺壳。",
+    ],
+}
+
+# shelter（落叶床）：操作当天文案 + 4~5 天后的一次性延迟反馈
+SHELTER_ACTION = {
+    "op": [
+        "你在岸边堆了一层落叶，铺成一张厚厚的床。枯叶挤在一起，在冷风里轻轻颤动，像是在相互取暖。",
+        "落叶堆在岸边，一层一层叠上去，软软的，散发着干叶子的味道。冷风从上面吹过，堆子底下是暖的。",
+        "你把落叶归拢，堆在水边不远的干处。枯黄的叶子叠在一起，缝隙里藏着不流动的空气。",
+    ],
+    "hint": [
+        "落叶堆的边缘被翻动过，几片叶子散在旁边。底下露出一个小小的洞口，幽深幽深的，有什么住在里面。",
+        "落叶堆中间微微凹陷下去，像是被什么压过。有几片叶子被拖进了洞里，只露出半截枯黄的尖。",
+        "落叶堆上凝了一层薄霜，白色的霜花覆在枯叶上。霜下面的叶子微微动了一下——底下有什么在翻身。",
+    ],
+}
+
+# 冬季 gaze 视角下沉：冰封时的微观描写（每次 gaze 随机抽一句）
+GAZE_WINTER_DEEP = [
+    "冰面把池塘封成一块浑浊的琥珀。光穿过冰层，变成一种灰蓝色的柔光，照在水底不动了的石头上。",
+    "泥鳅把自己埋进淤泥最深处，只留一对胡须露在外面，随着水底微弱的流动轻轻摆着。",
+    "水蚯蚓在泥面下扭成一团，红色的细丝缠在一起，动得很慢，像是怕浪费那一点点热量。",
+    "田螺停在石头上，壳口封了一层薄薄的膜。它们已经很久没有移动了，壳上积了一层细细的沉泥。",
+    "河蚌半埋在泥里，壳缝闭得紧紧的。水从它旁边流过，没有一道被滤清的痕迹。",
+    "鲫鱼悬在深水里，几乎不动。尾鳍偶尔摆一下，只是为了不沉下去。鳞片在暗处没有光。",
+    "青蛙埋进泥底，只留两个鼻孔露在外面。它的眼睛闭着，身体冷得跟周围的泥一样。",
+    "冰层下封着一串气泡，从水底升上来的时候被冻在了半途。它们停在冰里，像一串静止的省略号。",
+]
+
+# 年终简报越冬评语（按存活率分档，每年按年份轮换一句）
+WINTER_SURVIVAL_REMARK = {
+    "high": [
+        "池面冰封，冰下的世界却挺了过来。大多数生命都找到了自己过冬的方式，在黑暗里慢慢呼吸。",
+        "这个冬天没有带走太多。冰层下的池塘仍在缓缓运转，活下来的比失去的多得多。",
+        "春天第一道光劈开冰面的时候，池塘里到处都是等着苏醒的影子。它们熬过来了。",
+    ],
+    "mid": [
+        "冬天的池塘缩减了一圈。有些影子永远留在了冰层下的暗处，但更多的生命还在游动。",
+        "冰封是一场筛选。失去了一些，留下的还在。春天来的时候，池塘会从这些留下的开始重新填满。",
+        "冰雪覆盖的池塘沉默着，但沉默不等于空了。水底还有螺在爬，泥里还有鳅在钻。",
+    ],
+    "low": [
+        "这个冬天太重了。冰层下空了许多，水底沉寂着，只有少数生命还在挨着最后的日子。",
+        "春天回来的时候，池塘会比从前安静很多。但那些从冬天里活下来的，会在空出来的地方重新开始。",
+        "池塘被冬天洗了一遍。虽然冷清，但水底还在微微颤动——哪怕只剩几条水蚯蚓，生命的根就没断。",
+    ],
+}
+
+
+def _total_biomass(state):
+    """常驻物种的总生物量（用于越冬存活率快照与对比）。"""
+    pop = state["populations"]
+    return sum(pop.get(n, 0.0) for n in RESIDENT_SPECIES)
 
 
 # 季节性叙事事件文案（占位，后续可替换）
@@ -1580,6 +1676,11 @@ def _season_events(state, events, season, prev_season):
         if f.get("ice_on"):
             f["ice_on"] = False
             events.append("weather:" + SEASON_TEXT["冰融"])
+        # 冬季玩法计数春季重置：凿冰次数 / 落叶床 / 延迟反馈待发标记
+        f["crack_count"] = 0
+        f["shelter_used"] = False
+        f["crack_hint_pending"] = False
+        f["shelter_hint_pending"] = False
         # 青蛙苏醒：恢复冬眠前暂存的数量（item 五）
         hib = state.setdefault("hibernate", {})
         if hib.get("青蛙", 0) > 0:
@@ -1595,6 +1696,8 @@ def _season_events(state, events, season, prev_season):
         if pop.get("芦苇", 0) >= 1:
             events.append("season:" + SEASON_TEXT["芦苇枯黄"])
     elif season == "冬":
+        # 进入冬季：记录总生物量快照，供来年春季年终简报计算越冬存活率
+        f["winter_biomass_start"] = _total_biomass(state)
         # 昆虫冻死归零
         if pop.get("蚊子", 0) >= 1 or pop.get("蜻蜓成虫", 0) >= 1:
             events.append("season:" + SEASON_TEXT["昆虫冻死"])
@@ -1880,6 +1983,9 @@ def tick(state):
     # 结冰阻断气体交换：溶氧每天额外 -0.5（与浮萍覆盖叠加，item 五）
     if ice:
         env["dissolved_oxygen"] -= 0.5
+    # 凿冰洞（crack）：洞口气体交换恢复，持续 3 天每天溶氧额外 +0.3
+    if _chain_active(state, "ice_hole"):
+        env["dissolved_oxygen"] += 0.3
     # 浮萍 / 睡莲覆盖收紧（item D4）：覆盖 70% 起溶氧每天 -0.3；
     # 90% 以上彻底封住水面，溶氧每天 -1.0 且光照压到 0.1。
     if duckweed_cover >= 0.9:
@@ -1929,7 +2035,7 @@ def tick(state):
         k = max(1.0, k * drought_cap)
         sbf = _season_birth_factor(state, name, season)
         growth = sp["birth_rate"] * sbf * temp_factor * n * (1 - n / k)
-        death = sp["death_rate"] * _season_death_factor(name, season, turn) * n
+        death = sp["death_rate"] * _season_death_factor(state, name, season, turn) * n
         pop[name] = max(0.0, n + growth - death)
         # 死亡→恶化连锁：水生植物枯死的生物量也沉为有机碎屑（item D1）
         if name in ("水藻", "浮萍", "睡莲") and death > 0:
@@ -2041,7 +2147,7 @@ def tick(state):
             br *= 1.2
         k = sp["max_capacity"] * drought_cap   # 干旱水容量减半（item D2）
         births = br * n * (1 - n / max(1.0, k))
-        deaths = sp["death_rate"] * _season_death_factor(name, season, turn) * n
+        deaths = sp["death_rate"] * _season_death_factor(state, name, season, turn) * n
         # 低溶氧致死
         if sp.get("needs_oxygen") and env["dissolved_oxygen"] < 4.0:
             deaths += n * (4.0 - env["dissolved_oxygen"]) / 4.0 * 0.5
@@ -2127,7 +2233,7 @@ def tick(state):
     # --- (6b) 定居者摄食 + 衰老（在种群层 LV 计算之后） ---
     _process_settlers(state, events, r)
 
-    # --- (6c) 发现制：刷新历史最大值与连续天数，检查物种解锁 ---
+    # --- (6c) 解锁制：刷新历史最大值与连续天数，检查物种解锁 ---
     _update_max_seen(state)
     _update_streaks(state)
     _check_discovery(state, events)
@@ -2216,7 +2322,7 @@ def _apply_special_effects(state, events, r):
 
 
 def _update_streaks(state):
-    """更新发现制/成就所需的连续天数与历史标记。"""
+    """更新解锁制/成就所需的连续天数与历史标记。"""
     f = state["flags"]
     pop = state["populations"]
     env = state["env"]
@@ -2309,7 +2415,7 @@ def _process_spawning(state, events, season):
 
 
 # ---------------------------------------------------------------------------
-# 7b. v4：年鉴 / 万物志 / 定居者 / 发现制 / 决策
+# 7b. v4：年鉴 / 万物志 / 定居者 / 解锁制 / 决策
 # ---------------------------------------------------------------------------
 
 def _chronicle(state, text, key=True):
@@ -2334,7 +2440,7 @@ def _folio_bump(state, book, key, note=None):
 
 
 def _update_max_seen(state):
-    """刷新历史最大值字典（种群 + 有机碎屑），供发现制判定。"""
+    """刷新历史最大值字典（种群 + 有机碎屑），供解锁制判定。"""
     ms = state["max_seen"]
     pop = state["populations"]
     for name in SPECIES:
@@ -2347,7 +2453,7 @@ def _update_max_seen(state):
 
 
 def _check_discovery(state, events):
-    """发现制：生态达成条件时自动解锁物种并入册。
+    """解锁制：生态达成条件时自动解锁物种并入册。
 
     解锁冷却：两次解锁至少间隔 5 天，且每回合最多解锁一种，避免一口气弹出一串。
     """
@@ -2365,7 +2471,7 @@ def _check_discovery(state, events):
             state["last_unlock_turn"] = state["turn"]
             events.append("discover:%s——造物名册更新：【%s】" % (narrative, name))
             _chronicle(state, "%s——造物名册更新：%s" % (narrative, name))
-            # 物种志首次发现登记
+            # 物种志首次解锁登记
             sp = state["folio"]["species"].setdefault(name, {})
             sp.setdefault("first_day", state["turn"])
             sp.setdefault("first_season", state["season"])
@@ -2375,7 +2481,7 @@ def _check_discovery(state, events):
 
 
 def _folio_update_species(state):
-    """物种志：跟踪已发现物种的存活/归零次数（历史最大值由 max_seen 提供）。"""
+    """物种志：跟踪已解锁物种的存活/归零次数（历史最大值由 max_seen 提供）。"""
     cod = state["folio"]["species"]
     pop = state["populations"]
     for name in state["unlocked_species"]:
@@ -3281,8 +3387,21 @@ def _year_report(state, events):
     if hidden_alive:
         tail = "（另有 %d 种隐形生灵——%s——在水面之上往来。）" % (
             len(hidden_alive), "、".join(hidden_alive))
-    events.append("report:第 %d 年终了。这一年，%s如今池塘里还活跃着 %d 种生灵。%s"
-                  % (year, body, alive_count, tail))
+    # 越冬存活率：用进入冬季时的生物量快照对比春季当前生物量（item：冬季回顾）
+    winter = ""
+    start = state["flags"].pop("winter_biomass_start", None)
+    if start and start > 0:
+        pct = int(round(_total_biomass(state) / start * 100))
+        if pct >= 80:
+            tier, judge = "high", "安然越冬"
+        elif pct >= 50:
+            tier, judge = "mid", "尚可"
+        else:
+            tier, judge = "low", "损失惨重"
+        remark = WINTER_SURVIVAL_REMARK[tier][year % len(WINTER_SURVIVAL_REMARK[tier])]
+        winter = "本年冬季，你保住了 %d%% 的生物量，%s。%s" % (pct, judge, remark)
+    events.append("report:第 %d 年终了。这一年，%s如今池塘里还活跃着 %d 种生灵。%s%s"
+                  % (year, body, alive_count, tail, winter))
 
 
 def _unlock(state, events, name):
@@ -3531,7 +3650,7 @@ def _classify_event(ev):
     elif tag == "discover":
         m = re.search(r"【(.+?)】", body)
         sp = m.group(1) if m else ""
-        meta["name"] = "新物种发现"
+        meta["name"] = "新物种解锁"
         meta["effect"] = ("解锁「%s」" % sp) if sp else "解锁新物种"
     elif tag == "settler":
         meta["name"] = "流浪乌龟离开" if "乌龟" in body else "定居者离开"
@@ -3707,6 +3826,9 @@ def _observe_text(state, events):
                      % (state["turn"], len(state["achievements"]), len(ACHIEVEMENTS)))
     # 定居者延迟因果暗示（定居满 N 天的一次性描写）
     lines.extend(_settler_hint_lines(state))
+    # 冬季玩法延迟反馈（凿冰洞 / 落叶床，一次性）
+    for h in _winter_action_hints(state):
+        lines.append("· " + h)
     lines.append(_status_bar(state))
     return "\n".join(lines)
 
@@ -3834,6 +3956,10 @@ def _exec_one(state, part):
         return _cmd_feed(state, args)
     if verb in ("clean", "清理", "换水"):
         return _cmd_clean(state, args)
+    if verb in ("crack", "凿冰", "凿冰洞"):
+        return _cmd_crack(state, args)
+    if verb in ("shelter", "落叶床", "落叶"):
+        return _cmd_shelter(state, args)
     if verb in ("status", "状态", "面板"):
         return _cmd_status(state)
     if verb in ("encyclopedia", "图鉴"):
@@ -3996,7 +4122,7 @@ def _cmd_summon(state, args):
     if name is None:
         # 不限制：未知物种，自然规律当裁判 —— 直接告知它无法在池塘存活
         return "你投下%s，它在水中闪烁一下，便消散了。" % args[0]
-    # 发现制：只能召唤已解锁物种
+    # 解锁制：只能召唤已解锁物种
     if name not in state.get("unlocked_species", []):
         return "造物名册中尚无此物种的记录。"
     # 归零冷却：物种归零后 15 天内不能 summon 同种物种
@@ -4008,7 +4134,7 @@ def _cmd_summon(state, args):
     state["populations"][name] = new_pop
     if name not in state["seen"]:
         state["seen"].append(name)
-    # 投放后的瞬时数量计入历史最大值，使大批量投放能立刻满足发现制阈值
+    # 投放后的瞬时数量计入历史最大值，使大批量投放能立刻满足解锁制阈值
     ms = state["max_seen"]
     if new_pop > ms.get(name, 0):
         ms[name] = new_pop
@@ -4114,6 +4240,80 @@ def _cmd_clean(state, args):
     return "\n".join(lines)
 
 
+def _cmd_crack(state, args):
+    """凿冰洞：冬季冰封时凿穿冰面，恢复气体交换（ice_hole 持续 3 天，每天溶氧 +0.3）。
+
+    碎屑 5/次，每冬最多 3 次（春季重置）；第 3 次额外降水温 0.5；
+    效果延迟 2~3 天在后续 observe/gaze 中体现。
+    """
+    f = state["flags"]
+    env = state["env"]
+    if state["season"] != "冬" or not f.get("ice_on"):
+        return "现在不需要凿冰。"
+    if f.get("crack_count", 0) >= 3:
+        return "冰面已经凿得够多了，再凿水温会降得更低。"
+    if env["detritus"] < 5:
+        return "碎屑不足。"
+    r = rng_from(state)
+    env["detritus"] -= 5
+    f["crack_count"] = f.get("crack_count", 0) + 1
+    _chain_set(state, "ice_hole", 3)
+    lines = ["🧊 " + _gaze_pick(r, CRACK_ACTION["op"])]
+    if f["crack_count"] >= 3:
+        env["water_temp"] = _clamp(env["water_temp"] - 0.5, 0.0, 42.0)
+    # 延迟反馈：2~3 天后在 observe/gaze 末尾追加一句一次性描写
+    f["crack_hint_due"] = state["turn"] + r.randint(2, 3)
+    f["crack_hint_idx"] = r.randint(0, len(CRACK_ACTION["hint"]) - 1)
+    f["crack_hint_pending"] = True
+    _mark_intervention(state, True)
+    commit_rng(state, r)
+    return "\n".join(lines)
+
+
+def _cmd_shelter(state, args):
+    """落叶床：冬季在岸边堆落叶为底栖越冬者保暖。
+
+    碎屑 ≥20（消耗 20），每冬一次（春季重置）；chain "shelter" 持续到冬季结束，
+    4~5 天后生效，使田螺/水蚯蚓/泥鳅冬季死亡率 -30%；效果在 _season_death_factor 检查。
+    """
+    f = state["flags"]
+    env = state["env"]
+    if state["season"] != "冬":
+        return "现在不需要落叶床。"
+    if f.get("shelter_used"):
+        return "今冬已经铺过落叶床了。"
+    if env["detritus"] < 20:
+        return "碎屑不足，至少需要 20。"
+    r = rng_from(state)
+    env["detritus"] -= 20
+    f["shelter_used"] = True
+    # chain 持续到本冬季结束（冬季内剩余天数）
+    days_left = SEASON_LEN - (state["turn"] % SEASON_LEN)
+    _chain_set(state, "shelter", max(1, days_left))
+    lines = ["🍂 " + _gaze_pick(r, SHELTER_ACTION["op"])]
+    # 延迟反馈：4~5 天后在 observe/gaze 末尾追加一句一次性描写
+    f["shelter_hint_due"] = state["turn"] + r.randint(4, 5)
+    f["shelter_hint_idx"] = r.randint(0, len(SHELTER_ACTION["hint"]) - 1)
+    f["shelter_hint_pending"] = True
+    _mark_intervention(state, True)
+    commit_rng(state, r)
+    return "\n".join(lines)
+
+
+def _winter_action_hints(state):
+    """到期的冬季玩法延迟反馈（凿冰洞 / 落叶床），各只出现一次。返回原始文案列表。"""
+    f = state["flags"]
+    turn = state["turn"]
+    out = []
+    if f.get("crack_hint_pending") and turn >= f.get("crack_hint_due", turn + 1):
+        out.append(CRACK_ACTION["hint"][f.get("crack_hint_idx", 0) % len(CRACK_ACTION["hint"])])
+        f["crack_hint_pending"] = False
+    if f.get("shelter_hint_pending") and turn >= f.get("shelter_hint_due", turn + 1):
+        out.append(SHELTER_ACTION["hint"][f.get("shelter_hint_idx", 0) % len(SHELTER_ACTION["hint"])])
+        f["shelter_hint_pending"] = False
+    return out
+
+
 def _cmd_status(state):
     pop = state["populations"]
     env = state["env"]
@@ -4202,7 +4402,7 @@ def _cmd_encyclopedia(state):
     lines.append("  " + ("、".join(appeared) if appeared else "（暂无）"))
     hidden = len(RESIDENT_SPECIES) - len(appeared)
     if hidden:
-        lines.append("  尚未现身：%d 种（??? —— 还在水底的迷雾里等待被发现）" % hidden)
+        lines.append("  尚未现身：%d 种（??? —— 还在水底的迷雾里等待被解锁）" % hidden)
     lines.append("")
     # 访客图鉴段落：插在物种图鉴和成就之间
     lines.extend(_visitor_codex_lines(state))
@@ -4228,7 +4428,7 @@ def _cmd_folio(state):
         e = cod["species"].get(name, {})
         peak = int(round(ms.get(name, state["populations"].get(name, 0))))
         fd = e.get("first_day")
-        first = ("第%d天发现" % fd) if fd is not None else "开局已知"
+        first = ("第%d天解锁" % fd) if fd is not None else "开局已知"
         ext = e.get("extinct_count", 0)
         lines.append("  【%s】%s · 历史最高 %d · 归零 %d 次" % (name, first, peak, ext))
     if not appeared:
@@ -4338,6 +4538,9 @@ def _cmd_gaze(state):
     # 冬季：青蛙在冬眠，不描写活动，只点出泥底下的越冬者
     if season == "冬" and state.get("hibernate", {}).get("青蛙", 0) > 0:
         lines.append(_gaze_pick(r, GAZE_HIBERNATE))
+    # 冬季视角下沉：冰封时追加一句冰下微观描写
+    if season == "冬" and state["flags"].get("ice_on"):
+        lines.append(_gaze_pick(r, GAZE_WINTER_DEEP))
 
     # 定居者也要入画（最近 3 条不重复，item 8）
     for s in state.get("settlers", []):
@@ -4349,6 +4552,9 @@ def _cmd_gaze(state):
             if len(recent) > 3:
                 recent.pop(0)
             lines.append(tmpl[idx])
+
+    # 冬季玩法延迟反馈（凿冰洞 / 落叶床，一次性，同样在 gaze 里体现）
+    lines.extend(_winter_action_hints(state))
 
     commit_rng(state, r)
     return "\n".join(lines)
@@ -4535,6 +4741,8 @@ def _help_text():
         "  remove 物种 数量 从池塘中取走生物。（不可逆）\n"
         "  feed [数量]      撒下饲料（默认 1 份），滋养万物。（残饵沉底腐烂，碎屑越多越快恶化）\n"
         "  clean            清理水藻与浊水，池水变清，但会带走水蚤、孑孓等微小生命。\n"
+        "  crack            【冬·冰封】凿开冰洞恢复气体交换（碎屑 5，每冬至多 3 次）。\n"
+        "  shelter          【冬】岸边堆落叶床，为田螺/水蚯蚓/泥鳅保暖越冬（碎屑 20，每冬一次）。\n"
         "  choose 选项      对眼前的事做出选择。（choose 1 / choose 收留 均可）\n"
         "  status           详细数据面板。\n"
         "  folio            万物志（物种/定居者/访客/事件）。\n"
