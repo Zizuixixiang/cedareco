@@ -57,7 +57,7 @@ class Mulberry32:
 
 
 # ---------------------------------------------------------------------------
-# 2. 物种定义（14 种常驻 + 蜻蜓成虫隐形变量）
+# 2. 物种定义（19 种常驻 + 3 种隐藏：细菌、蜻蜓成虫、蚊子）
 # ---------------------------------------------------------------------------
 # 字段：
 #   space          空间：水中/水面/水底/岸边/空中
@@ -2591,7 +2591,8 @@ def _natural_recovery(state, events, r):
             continue
         sp = SPECIES[name]
         if sp.get("trophic") != "producer":
-            if not any(pop.get(f, 0) > 0 for f in sp.get("food_sources", [])):
+            foods = sp.get("food_sources", [])
+            if "飞虫" not in foods and not any(pop.get(f, 0) > 0 for f in foods):
                 continue
         if r.random() < 0.01:
             pop[name] = pop.get(name, 0) + r.randint(2, 5)
@@ -2839,7 +2840,7 @@ def _process_settlers(state, events, r):
                     # 翠鸟幼体"叼着鲫鱼"文案需池塘有鱼，否则改用其他成长文案（补#6）
                     if name == "翠鸟" and state["populations"].get("鲫鱼", 0) < 1:
                         pool = [t for t in grown if "鲫鱼" not in t] or grown
-                    events.append("settler_birth:" + _pick(r, pool))
+                    events.append("settler_grown:" + _pick(r, pool))
                 _chronicle(state, SETTLER_GROWN_CHRON % name)
         # 摄食
         if s.get("juvenile"):
@@ -3651,7 +3652,7 @@ EVENT_ICONS = {
     "crisis": "⚠️", "lifecycle": "🦋", "spawn": "🥚", "achievement": "🏆",
     "discover": "🔎", "choice": "❓", "choice_auto": "⌛", "settler": "🐢",
     "settler_hunt": "🐟", "settler_miss": "💨", "settler_leave": "🚪",
-    "settler_birth": "🐣", "weather": "🌫", "report": "📅", "disease": "🦠",
+    "settler_birth": "🐣", "settler_grown": "🐣", "weather": "🌫", "report": "📅", "disease": "🦠",
     "recovery": "🌱",
 }
 
@@ -3662,7 +3663,7 @@ _VISITOR_TABLE = [
     ("爪子探入水中", "流浪猫来访", "visitor", "鲫鱼 -1"),
     ("扑进芦苇丛", "流浪猫来访", "visitor", "田鼠 -1"),
     ("爪子空落落", "流浪猫来访", "visitor", "无"),
-    ("刺球", "刺猬来访", "visitor", "孑孓↓"),
+    ("刺球", "刺猬来访", "visitor", "水黾↓"),
     ("细长的影子追着田鼠", "黄鼠狼来访", "visitor", "田鼠↓"),
     ("鹿俯颈饮水", "鹿来访", "visitor", "浑浊↑ 浮萍↓"),
     ("无数萤火", "萤火虫大爆发", "legend", "观赏奇景"),
@@ -3679,7 +3680,7 @@ _VISITOR_TABLE = [
 # 决策事件按正文关键字归到标题（触发描述 / 超时结算文案均可识别）
 _CHOICE_KEYWORDS = [
     # V1.0 扩展（更具体的关键词放前面，优先匹配）
-    ("第五次", "翠鸟定居"), ("蓝影", "翠鸟定居"), ("枯枝的弯处", "翠鸟定居"),
+    ("翠鸟第", "翠鸟定居"), ("蓝影", "翠鸟定居"), ("枯枝的弯处", "翠鸟定居"),
     ("苍鹭第三次", "苍鹭定居"), ("衔着一根枯枝", "苍鹭定居"), ("最从容的住客", "苍鹭定居"),
     ("白鹭", "白鹭来访"),
     ("上游的水", "洪水"), ("洪水", "洪水"), ("开放引入", "洪水"),
@@ -3698,6 +3699,8 @@ def _choice_title_from_text(text):
     for kw, title in _CHOICE_KEYWORDS:
         if kw in text:
             return title
+    if re.search(r"翠鸟第.+次", text):
+        return "翠鸟定居"
     return "池畔抉择"
 
 
@@ -3776,12 +3779,12 @@ def _classify_event(ev):
         meta["effect"] = "离开池塘"
     elif tag == "settler_birth":
         who = next((n for n in SETTLER_TYPES if n in body), "定居者")
-        if "长大" in body:
-            meta["name"] = who + "成年"
-            meta["effect"] = "幼体长成"
-        else:
-            meta["name"] = who + "繁殖"
-            meta["effect"] = "添了新一代"
+        meta["name"] = who + "繁殖"
+        meta["effect"] = "添了新一代"
+    elif tag == "settler_grown":
+        who = next((n for n in SETTLER_TYPES if n in body), "定居者")
+        meta["name"] = who + "成年"
+        meta["effect"] = "幼体长成"
     elif tag == "achievement":
         m = re.search(r"【(.+?)】", body)
         meta["name"] = m.group(1) if m else "成就"
@@ -4061,7 +4064,7 @@ def cmd(command):
         if state.get("pending_choice"):
             note += "\n" + _choice_prompt(state["pending_choice"])
         outputs.append(note)
-    save_state(state)
+    save_state(_STATE)
     return "\n\n".join(outputs)
 
 
@@ -4264,8 +4267,9 @@ def _cmd_choose(state, args):
         return "此刻无事发生。"
     idx = _parse_choice(args, pc["choices"])
     if idx is None:
-        return "无法识别你的选择。请输入 choose 1 (%s) 或 choose 2 (%s)。" % (
-            pc["choices"][0], pc["choices"][1])
+        opts = " 或 ".join("choose %d (%s)" % (i + 1, lab)
+                           for i, lab in enumerate(pc["choices"]))
+        return "无法识别你的选择。请输入 %s。" % opts
     evs = []
     msg = _resolve_choice(state, pc, idx, evs)
     state["pending_choice"] = None
@@ -4810,6 +4814,9 @@ def _cmd_look(state, args):
         if vis:
             return vis
         return "图鉴里没有「%s」。" % key
+    if name not in _unlocked_set(state):
+        clue = FOLIO_CLUES.get(name, "线索隐约，尚不可知")
+        return "【???】%s" % clue
     sp = SPECIES[name]
     troph_label = {"producer": "生产者", "primary": "初级消费者",
                    "secondary": "次级消费者", "apex": "大型杂食鱼", "decomposer": "分解者"}
