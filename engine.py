@@ -3763,8 +3763,16 @@ def _classify_event(ev):
         meta["name"] = "新物种解锁"
         meta["effect"] = ("解锁「%s」" % sp) if sp else "解锁新物种"
     elif tag == "settler":
-        meta["name"] = "流浪乌龟离开" if "乌龟" in body else "定居者离开"
-        meta["effect"] = "离开池塘"
+        if "缩进壳" in body:
+            meta["name"] = "乌龟冬眠"
+            meta["effect"] = "进入冬眠"
+        elif "探出头" in body:
+            meta["name"] = "乌龟苏醒"
+            meta["effect"] = "结束冬眠"
+        else:
+            who = next((n for n in SETTLER_TYPES if n in body), "定居者")
+            meta["name"] = who + "事件"
+            meta["effect"] = "定居者动态"
     elif tag == "settler_hunt":
         who = next((n for n in ("翠鸟", "苍鹭") if n in body), "定居者")
         meta["name"] = who + "捕食"
