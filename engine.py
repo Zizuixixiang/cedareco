@@ -244,7 +244,7 @@ SETTLER_TYPES = {
     "流浪乌龟": {"max_age": 90, "daily_food": {"水藻": 2, "鲫鱼": 1},
             "juvenile_days": 30, "max_count": 5},
     # daily_food 中的 "有机碎屑" 特殊处理：从环境 detritus 扣除
-    "螃蟹": {"max_age": 120, "daily_food": {"田螺": 1, "河蚌": 0.5, "有机碎屑": 2},
+    "螃蟹": {"max_age": 120, "daily_food": {"田螺": 1, "河蚌": 0.5, "有机碎屑": 4},
             "turbidity_per_day": 0.01, "juvenile_days": 20, "max_count": 6},
     "水蛇": {"max_age": 150, "daily_food": {"鲫鱼": 1, "青蛙": 0.5, "田鼠": 0.5},
             "juvenile_days": 15, "max_count": 6},
@@ -253,7 +253,7 @@ SETTLER_TYPES = {
             "juvenile_days": 15, "max_count": 8},
     # 访客变常驻 —— 捕食型定居者（hunter）：按概率捕食，详见 _process_settlers
     #   每天 40% 安静（不出现在描写中），60% 触发捕食尝试；
-    #   尝试成功率 40%（猎物总数 < 5 时降为 20%；冬季翠鸟额外降到 15%）；
+    #   尝试成功率 40%（猎物总数 < 5 时降为 20%；冬季翠鸟额外降到 25%）；
     #   成功扣 1 猎物 + health 恢复 0.1；连续 3 天无成功开始掉血
     #   （第 3~5 天 -0.05/天，第 6 天起 -0.1/天）。
     "翠鸟": {"max_age": 200, "hunter": {"prey": ["鲫鱼"]},
@@ -2728,9 +2728,9 @@ def _settler_hunt(state, s, hunter, events, r):
             s["since_hunt"] = s.get("since_hunt", 0) + 1
         else:
             succ_p = 0.4 if prey_total >= 5 else 0.2
-            # 冬季鱼活动迟缓更难捕捉：翠鸟成功率额外压到 15%（item 11）
+            # 冬季鱼活动迟缓更难捕捉：翠鸟成功率额外压到 25%（item 11）
             if state["season"] == "冬" and s["name"] == "翠鸟":
-                succ_p = min(succ_p, 0.15)
+                succ_p = min(succ_p, 0.25)
             if r.chance(succ_p):
                 for p in prey_list:
                     if pop.get(p, 0) >= 1:
