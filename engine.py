@@ -1428,6 +1428,7 @@ def fresh_state(seed):
         "choice_cooldowns": {},      # 决策事件 -> 上次触发的回合（冷却用）
         "extinct_alerted": [],       # 已就归零提醒过的物种（去重，恢复后清除）
         "extinct_turn": {},          # 物种 -> 归零回合（summon 15 天冷却用）
+        "last_clean_turn": -999,     # 上次 clean 的回合（冷却用）
         # V1.0 扩展：连锁叙事计时器 与 解锁冷却
         "chain": {},                 # 连锁效果 -> 生效截止回合
         "last_unlock_turn": -999,    # 上次解锁回合（解锁冷却用）
@@ -1958,7 +1959,7 @@ DISEASE_END = [
 ]
 # chronicle 记录：开始 / 传染 / 结束 各 5 句
 DISEASE_CHRON_START = [
-    "池塘里有什么在悄悄蔓延。先是几条鲫鱼游歪了，然后是更多的影子跟着歪斜。",
+    "池塘里有什么在悄悄蔓延。先是几条鱼游歪了，然后是更多的影子跟着歪斜。",
     "一种看不见的东西潜入了池塘。它在水里扩散，谁也不知道边界在哪里。",
     "池塘开始生病了。第一具尸体浮上水面的时候，谁也没想到这只是一个开始。",
     "水底的泥鳅不再钻泥，水面下的孑孓不再扭动。池塘的节奏乱了。",
@@ -3018,16 +3019,27 @@ def _settler_graze(state, s, events, r):
 
 
 def _settler_warn_chronicle(state, s):
-    """食物不足预警：跨过 0.5 / 0.3 阈值时各记一次 chronicle（去重，恢复后可再触发）。"""
+    """食物不足预警：跨过 0.5 / 0.3 阈值时各记一次 chronicle（去重，恢复后可再触发）。
+    同一天同物种只记一条（避免多条蛇/鸭同时饥饿时年鉴刷屏）。"""
     h = s["health"]
     name = s["name"]
     lvl = s.get("warn_level", 0)
+    # 按物种+天去重：同一天同物种已记过则跳过（只保留当天数据，避免累积）
+    warn_dedup = state.get("_warn_dedup")
+    if not warn_dedup or warn_dedup.get("_day") != state["turn"]:
+        warn_dedup = {"_day": state["turn"]}
+        state["_warn_dedup"] = warn_dedup
+    day_key = name
     if h < 0.3 and lvl < 2:
         s["warn_level"] = 2
-        _chronicle(state, SETTLER_WARN_CHRON_HEAVY % name, key=False)
+        if day_key not in warn_dedup:
+            warn_dedup[day_key] = True
+            _chronicle(state, SETTLER_WARN_CHRON_HEAVY % name, key=False)
     elif 0.3 <= h < 0.5 and lvl < 1:
         s["warn_level"] = 1
-        _chronicle(state, SETTLER_WARN_CHRON_LIGHT % name, key=False)
+        if day_key not in warn_dedup:
+            warn_dedup[day_key] = True
+            _chronicle(state, SETTLER_WARN_CHRON_LIGHT % name, key=False)
     elif h >= 0.5 and lvl != 0:
         s["warn_level"] = 0
 
@@ -3120,11 +3132,13 @@ def _process_settlers(state, events, r):
             events.append("settler_leave:" + leave)
             _chronicle(state, leave_chron)
             _archive_settler_life(state, s, leave_reason)
-            # 个体分开计数：定居者离开/死亡后，对应访客来访次数清零，
-            # 下一只同种访客从第 1 次重新累计（item 1）
+            # 个体分开计数：纯访客离开后来访次数清零，下一只从第 1 次重新累计；
+            # 但已定居过的（notes 里有"收留"等记录）保留计数，避免 folio 显示"× 0"矛盾。
             v = state["folio"]["visitors"].get(name)
             if v:
-                v["count"] = 0
+                notes_joined = " ".join(v.get("notes", []))
+                if "收留" not in notes_joined and "留下" not in notes_joined:
+                    v["count"] = 0
         else:
             survivors.append(s)
     # 繁殖：同种 >= 2，春夏季每天 5% 概率，未达上限则添一只幼体
@@ -3821,7 +3835,10 @@ def _year_report(state, events):
         else:
             tier, judge = "low", "损失惨重"
         remark = WINTER_SURVIVAL_REMARK[tier][year % len(WINTER_SURVIVAL_REMARK[tier])]
-        winter = "本年冬季，你保住了 %d%% 的生物量，%s。%s" % (pct, judge, remark)
+        if pct > 100:
+            winter = "本年冬季，生物量不降反增至 %d%%，%s。%s" % (pct, judge, remark)
+        else:
+            winter = "本年冬季，你保住了 %d%% 的生物量，%s。%s" % (pct, judge, remark)
     events.append("report:第 %d 年终了。这一年，%s如今池塘里还活跃着 %d 种生灵。%s%s"
                   % (year, body, alive_count, tail, winter))
 
@@ -4896,6 +4913,9 @@ def _cmd_status(state):
         lines.append("─ 天气 ─")
         lines.append("  ⛅ %s进行中（第 %d/%d 天）" % (aw["kind"], aw["elapsed"], aw["duration"]))
     lines.append("已解锁成就：%d/%d" % (len(state["achievements"]), len(ACHIEVEMENTS)))
+    pc = state.get("pending_choice")
+    if pc:
+        lines.append("⏳ 当前有 1 条待决策事件（输入 choose 查看）")
     score, word = _pond_score(state)
     lines.append("🌡 池塘评分：%d/100（%s）" % (score, word))
     lines.append(_status_bar(state))
