@@ -178,7 +178,7 @@ SPECIES = {
     "河蚌": {
         # 滤食者：每天降浑浊度、扣水蚤、产假粪加碎屑；浑浊/缺氧时死亡率翻倍
         "space": "水底", "trophic": "primary",
-        "birth_rate": 0.02, "death_rate": 0.02, "max_capacity": 15,
+        "birth_rate": 0.04, "death_rate": 0.015, "max_capacity": 25,
         "food_sources": [], "predation": 0.0, "init": 0,
         "filter_feeder": True, "needs_oxygen": True,
     },
@@ -1132,6 +1132,13 @@ OBSERVE_AMBIENT = {
         ("池塘闷住了。连水蚤都挤到了近水面，密密麻麻，在那一层薄薄的氧气里争着喘息。", ["水蚤"]),
         ("水底暗沉沉的，连水藻都不怎么冒气泡了。鱼群浮在近水面，鳍划得很慢，像是在稠稠的液体里搅动。", ["水藻"]),
         "池塘的呼吸越来越浅。水面那一层气泡聚了又散，散了又聚，底下的生命在一点一点往上挤。",
+    ],
+    "critical_low_do": [
+        "水面浮着一层细密的气泡，聚在岸边和水草周围，久久不散。水色比平时暗了一层。",
+        "几条鲫鱼把嘴探出水面，急促地张合。不是那种悠闲的换气，而是一下接一下，像是在跟空气抢时间。",
+        "水蚤升到了近水面，密密麻麻挤在那一层氧气稍微多一点的地方。它们弹跳的幅度变小了，像被什么压着。",
+        "田螺从石头上滑下来，翻倒在泥里，没有翻回去。壳口微张，里面的软体轻轻抽搐了一下。",
+        "池塘闷住了。连水草都不怎么冒泡了，平时那串细细的气泡断了，很久才冒上来一颗。",
     ],
     "high_nutrients": [
         "水色发绿，浓得有些黏稠。光只穿得进一半，水底的一切都模糊了轮廓。",
@@ -2520,11 +2527,13 @@ def _pair_settle_text(state, was_pair, name):
 
 
 def _is_present(state, name):
-    """物种是否仍存在：种群 >= 1，或正在冬眠（暂存数量 >= 1）。
+    """物种是否仍存在：种群 >= 0.5（对外展示 round 为整数时 >= 1），或正在冬眠。
 
+    阈值 0.5：LV 方程产生浮点残余（如 0.7）时，对外 round 显示为 1，
+    但旧阈值 >= 1 会将其误判为归零，导致"⚠️ 自动暂停：X 数量归零"与 JSON 口径不一致。
     冬眠中的物种不应被判为归零（item 五：青蛙冬眠不是死亡）。
     """
-    if state["populations"].get(name, 0) >= 1:
+    if state["populations"].get(name, 0) >= 0.5:
         return True
     return state.get("hibernate", {}).get(name, 0) >= 1
 
@@ -3569,7 +3578,8 @@ def _random_events(state, events, r, season):
         _folio_bump(state, "events", "大雾", "光照骤降两三天")
     # 洪水（稀有 ~0.8%，仅夏）：直接发生的持续灾害（2-3 天），不弹天气选项；
     # 只有冲入螃蟹时才弹收留/放走的动物决策（item E2）。已有进行中灾害时不叠加。
-    if no_weather and season == "夏" and vis(0.008):
+    # 同一 tick 内若已有待决选择（如干旱/暴雨），洪水推迟，避免"干旱+洪水"并列混淆。
+    if no_weather and season == "夏" and can_choose() and vis(0.008):
         _start_weather(state, "洪水", False)
         pop["河蚌"] *= 0.7  # 洪水冲击：河蚌 -30%
         events.append("disaster:" + CHOICE_EVENTS["洪水"]["desc"])
@@ -3919,6 +3929,14 @@ def _pond_score(state):
     total = (diversity * 0.20 + balance * 0.15 + chain * 0.20
              + env_health * 0.15 + settler_s * 0.10 + dur * 0.20)
     score = int(round(_clamp(total, 0.0, 100.0)))
+    
+    # 低溶氧惩罚：DO < 3 时评分 *50%，DO < 1 时评分 *30%
+    do = env["dissolved_oxygen"]
+    if do < 1.0:
+        score = int(round(score * 0.30))
+    elif do < 3.0:
+        score = int(round(score * 0.50))
+    
     if score >= 90:
         word = "欣欣向荣"
     elif score >= 70:
@@ -4193,7 +4211,9 @@ def _observe_ambient(state):
     if aw:
         environ = _pick_t(state, WEATHER_ONGOING[aw["kind"]])
     else:
-        if env["dissolved_oxygen"] < 4.0:
+        if env["dissolved_oxygen"] < 1.0:
+            cat = "critical_low_do"  # 极度缺氧（毁灭性）
+        elif env["dissolved_oxygen"] < 4.0:
             cat = "low_do"
         elif len([n for n in RESIDENT_SPECIES
                   if n in _unlocked_set(state) and pop.get(n, 0) >= 1]) > 10:
@@ -4605,6 +4625,7 @@ def _cmd_choose(state, args):
     evs = []
     msg = _resolve_choice(state, pc, idx, evs)
     state["pending_choice"] = None
+    state["log"] = []
     _mark_intervention(state, True)
     lines = ["🫳 " + msg]
     lines.extend(_render_events(evs))
@@ -5432,11 +5453,12 @@ def _help_text():
 # ---------------------------------------------------------------------------
 
 def new_game(seed=12345):
-    """重开一局，重置状态并存档。"""
+    """重开一局，重置状态并存档。返回开局文字（不暴露内部状态）。"""
     global _STATE
     _STATE = fresh_state(seed)
     save_state(_STATE)
-    return _STATE
+    return ("🌊 新池初成（seed=%d）。一池清水，静待你的第一笔。\n"
+            "万物始于水中微光——也许，从最简单的绿开始。\n\n" % seed) + cmd("status")
 
 
 # ---------------------------------------------------------------------------
