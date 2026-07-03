@@ -629,19 +629,40 @@ CHOICE_EVENTS = {
         "title": "水獭来访",
     },
     "暴雨": {
-        "desc": "天暗下来，云层压得很低，空气里满是雨腥气。",
+        "desc": "天暗下来，云层压得很低，空气里满是雨腥气。水面一动不动，像在屏住呼吸等。",
+        "desc_pool": [
+            "天暗下来，云层压得很低，空气里满是雨腥气。水面一动不动，像在屏住呼吸等。",
+            "远天滚过一声闷雷。风突然停了，水面上最后几圈涟漪也消失了。空气闷得发黏。",
+            "云堆在天边，一层叠一层，越叠越厚。光线暗下来，水面变成一片灰亮的铅色。",
+            "第一滴雨砸在水面上，激起一小圈纹。然后是第二滴、第三滴。水面开始发颤。",
+            "风先到了，把芦苇压得伏低。水面起了细密的疙瘩，空气里那股雨腥气越来越浓。",
+        ],
         "requires": [],
         "choices": ["提前加固堤岸", "顺其自然"],
         "title": "暴雨",
     },
     "干旱": {
-        "desc": "日光一天天晒着，水面缓慢退下，露出一圈干裂的泥岸。",
+        "desc": "日光一天接一天地晒着。水面缓缓退下去，泥岸上裂出细密的纹路，像一张渴了很久的嘴。",
+        "desc_pool": [
+            "日光一天接一天地晒着。水面缓缓退下去，泥岸上裂出细密的纹路，像一张渴了很久的嘴。",
+            "水位线在石头上留下一道干涸的印记，那道印一天比一天高。石头露出水面的部分越来越多。",
+            "池塘在缩小。岸边的泥被晒得发白，边缘卷起来，踩上去会脆生生地裂开。",
+            "水面离岸越来越远，露出一圈干裂的泥滩。几片枯叶贴在泥上，被太阳晒得卷了边。",
+            "风吹过时不再带着水汽，而是干热的，夹着细尘。池塘在一天天熬着。",
+        ],
         "requires": [],
         "choices": ["下雨", "静观其变"],
         "title": "干旱",
     },
     "热浪": {
-        "desc": "热空气压着池塘，水面不闪动了，水底在变闷。",
+        "desc": "热空气压着池塘。水面纹丝不动，光直直打在上面，反射出一片晃眼的白。",
+        "desc_pool": [
+            "热空气压着池塘。水面纹丝不动，光直直打在上面，反射出一片晃眼的白。",
+            "水面蒸着薄薄的热气，远看像一层透明的纱。水下的影子都沉在最深处，一动不动。",
+            "连蝉都叫得发闷。池塘像是被扣在一口热锅里，空气黏稠，水汽散不出去。",
+            "鱼浮上来换气，嘴张得比平时大，又慢。水面起了一层细密的气泡，聚在岸边。",
+            "烈日把水晒得温热，连阴影里都躲着暑气。池塘在喘，水草软软地垂着，不再冒泡。",
+        ],
         "requires": [],
         "choices": ["为池塘遮荫降温", "硬扛过去"],
         "title": "热浪",
@@ -654,7 +675,14 @@ CHOICE_EVENTS = {
         "title": "白鹭来访",
     },
     "洪水": {
-        "desc": "暴雨连下数日，上游的水翻涌而下。池塘正在被淹没，浑浊的洪水冲了进来。",
+        "desc": "上游的水翻涌而下，裹着断枝和碎叶，浑浊的洪流撞进池塘，水面猛地涨了一截。",
+        "desc_pool": [
+            "上游的水翻涌而下，裹着断枝和碎叶，浑浊的洪流撞进池塘，水面猛地涨了一截。",
+            "泥沙在水中翻搅，清水和浑水在水面交界处旋成一道弧线。池塘正在被冲成另一种颜色。",
+            "洪水带着泥沙灌进来，水底的一切都被搅了起来。石头在翻滚，水草被连根拔起。",
+            "水位猛涨，岸边的界线被淹没了。洪水冲刷着泥岸，大块大块的土塌进水里。",
+            "水流裹挟着不知从哪里冲来的东西——断枝、碎叶、一团纠缠的草根。池塘正被重新拼凑。",
+        ],
         "requires": [],
         "choices": ["加固堤岸", "开放引入"],
         "title": "洪水",
@@ -1231,6 +1259,15 @@ WATER_DEGRADE = {
         "气泡从水底一串串升上来，在水面堆成一小片浮沫，黏稠，微微发亮。",
     ],
 }
+
+# 富营养化首次自生文案（营养盐 > 180 且水藻 = 0 时触发）
+EUTROPHICATION_TEXT = [
+    "水色有些不对了。不是清澈的，带着一点隐约的绿。",
+    "岸边的石头上多了一层滑腻的绿膜，薄得几乎看不出来，但手指一摸就是。",
+    "水底泛着淡淡的绿意，像是有什么正在从看不见的地方慢慢长出来。",
+    "水草上挂了一层黏糊糊的绿絮，极薄，在水里轻轻晃着，拉成细长的丝。",
+    "水面不再是透亮的了。光穿下去的时候，在半途就被染成了淡绿色。",
+]
 
 # ---------------------------------------------------------------------------
 # 2g-2. 物种自然恢复文案（种群归零后，条件满足时小概率自然回归）
@@ -2429,6 +2466,12 @@ def tick(state):
     env["nutrients"] = _clamp(env["nutrients"], 0.0, 500.0)
     env["detritus"] = _clamp(env["detritus"], 0.0, 1000.0)
 
+    # 富营养化：营养盐 > 180 且无水藻时，水藻自然萌发（一次性种子）
+    if env["nutrients"] > 180 and pop.get("水藻", 0) < 1:
+        pop["水藻"] = 10.0
+        events.append("eutrophication:" + _pick_t(state, EUTROPHICATION_TEXT))
+        _chronicle(state, "池塘富营养化，水藻自然萌发。")
+
     # --- (6b) 定居者摄食 + 衰老（在种群层 LV 计算之后） ---
     _process_settlers(state, events, r)
 
@@ -3287,11 +3330,14 @@ def _trigger_choice(state, events, key, desc_override=None):
     """
     spec = CHOICE_EVENTS[key]
     # 动态描述：只提及当前真实在场的目标，避免"盯上不存在的猎物"
-    desc = desc_override or spec["desc"]
+    desc = desc_override or spec.get("desc")
     if desc_override is None and spec.get("desc_tmpl") and spec.get("requires"):
         present = [n for n in spec["requires"] if state["populations"].get(n, 0) >= 1]
         if present:
             desc = spec["desc_tmpl"] % "和".join(present)
+    # 从文案池中确定性取一条（不消耗 PRNG，保持随机流对齐）
+    if desc_override is None and spec.get("desc_pool"):
+        desc = _pick_t(state, spec["desc_pool"])
     state["pending_choice"] = {
         "event": key,
         "desc": desc,
@@ -3667,7 +3713,7 @@ def _random_events(state, events, r, season):
     if no_weather and season == "夏" and can_choose() and vis(0.008):
         _start_weather(state, "洪水", False)
         pop["河蚌"] *= 0.7  # 洪水冲击：河蚌 -30%
-        events.append("disaster:" + CHOICE_EVENTS["洪水"]["desc"])
+        events.append("disaster:" + _pick_t(state, CHOICE_EVENTS["洪水"].get("desc_pool", [CHOICE_EVENTS["洪水"]["desc"]])))
         _folio_bump(state, "events", "洪水", "上游来水，持续 2-3 天")
         _chain_set(state, "crab_incoming", 3)  # 洪水期间可能触发螃蟹定居决策
     # 水华（自动触发）：以下任一条件命中即可触发，各自独立判定概率。
@@ -4110,7 +4156,7 @@ EVENT_ICONS = {
     "discover": "🔎", "choice": "❓", "choice_auto": "⌛", "settler": "🐢",
     "settler_hunt": "🐟", "settler_miss": "💨", "settler_leave": "🚪",
     "settler_birth": "🐣", "settler_grown": "🐣", "weather": "🌫", "report": "📅", "disease": "🦠",
-    "recovery": "🌱",
+    "recovery": "🌱", "eutrophication": "🟢",
 }
 
 # 生物访客/灾害事件识别表：(body 关键片段, 标题名, 事件类型, 影响描述)
@@ -4266,6 +4312,9 @@ def _classify_event(ev):
     elif tag == "recovery":
         meta["name"] = "自然恢复"
         meta["effect"] = "归零物种重现"
+    elif tag == "eutrophication":
+        meta["name"] = "富营养化"
+        meta["effect"] = "水藻萌发"
     elif tag in ("choice", "choice_auto"):
         meta["name"] = _choice_title_from_text(body)
         meta["effect"] = "等待抉择" if tag == "choice" else "超时自动结算"
@@ -4652,7 +4701,8 @@ def _advance(state, days):
                 who = next((n for n in ("翠鸟", "苍鹭") if n in meta["body"]), "定居者")
                 hunt_miss[who] = hunt_miss.get(who, 0) + 1
             elif tag in ("crisis", "disaster", "legend", "achievement",
-                         "discover", "settler", "settler_leave", "settler_birth", "report"):
+                         "discover", "settler", "settler_leave", "settler_birth", "report",
+                         "eutrophication"):
                 key_events.append("第%d天 %s" % (state["turn"], meta["body"]))
         # 决策事件：立即暂停，记录剩余天数
         if state.get("pending_choice"):
