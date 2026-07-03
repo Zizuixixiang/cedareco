@@ -3654,50 +3654,32 @@ def _random_events(state, events, r, season):
     if bloom_hit and can_choose() and _choice_ready(state, "水华"):
         _trigger_choice(state, events, "水华")
 
-    # ---- 隐藏物种极端状态提示（条件满足时触发，恢复正常后可再次触发） ----
+    # ---- 隐藏物种极端状态提示（跨越阈值时触发，同一极端不重复） ----
     flags = state["flags"]
     mosq = pop.get("蚊子", 0)
     dfl_adult = pop.get("蜻蜓成虫", 0)
     bact = pop.get("细菌", 0)
 
-    if mosq > 400:
-        if not flags.get("hint_mosquito_high"):
-            flags["hint_mosquito_high"] = True
-            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["mosquito_high"]))
-    else:
-        flags.pop("hint_mosquito_high", None)
-    if 0 < mosq < 30:
-        if not flags.get("hint_mosquito_low"):
-            flags["hint_mosquito_low"] = True
-            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["mosquito_low"]))
-    else:
-        flags.pop("hint_mosquito_low", None)
+    # 蚊子：high / low / normal
+    mosq_state = "high" if mosq > 400 else ("low" if 0 < mosq < 30 else "normal")
+    prev_mosq = flags.get("hint_mosquito_state", "normal")
+    if mosq_state != "normal" and mosq_state != prev_mosq:
+        events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["mosquito_" + mosq_state]))
+    flags["hint_mosquito_state"] = mosq_state
 
-    if dfl_adult > 50:
-        if not flags.get("hint_dragonfly_high"):
-            flags["hint_dragonfly_high"] = True
-            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["dragonfly_high"]))
-    else:
-        flags.pop("hint_dragonfly_high", None)
-    if 0 < dfl_adult < 5:
-        if not flags.get("hint_dragonfly_low"):
-            flags["hint_dragonfly_low"] = True
-            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["dragonfly_low"]))
-    else:
-        flags.pop("hint_dragonfly_low", None)
+    # 蜻蜓成虫
+    dfl_state = "high" if dfl_adult > 50 else ("low" if 0 < dfl_adult < 5 else "normal")
+    prev_dfl = flags.get("hint_dragonfly_state", "normal")
+    if dfl_state != "normal" and dfl_state != prev_dfl:
+        events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["dragonfly_" + dfl_state]))
+    flags["hint_dragonfly_state"] = dfl_state
 
-    if bact > 1500:
-        if not flags.get("hint_bacteria_high"):
-            flags["hint_bacteria_high"] = True
-            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["bacteria_high"]))
-    else:
-        flags.pop("hint_bacteria_high", None)
-    if 0 < bact < 100:
-        if not flags.get("hint_bacteria_low"):
-            flags["hint_bacteria_low"] = True
-            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["bacteria_low"]))
-    else:
-        flags.pop("hint_bacteria_low", None)
+    # 细菌
+    bact_state = "high" if bact > 1500 else ("low" if 0 < bact < 100 else "normal")
+    prev_bact = flags.get("hint_bacteria_state", "normal")
+    if bact_state != "normal" and bact_state != prev_bact:
+        events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["bacteria_" + bact_state]))
+    flags["hint_bacteria_state"] = bact_state
 
 
 # 季节性自然归零：这些物种在对应季节归零属正常季节更替，只在 wait 摘要里体现，
