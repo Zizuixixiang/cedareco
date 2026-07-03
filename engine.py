@@ -1558,6 +1558,8 @@ def _migrate(state):
     state.setdefault("prev_env", None)
     state.setdefault("last_delta", {})
     state.setdefault("history", [])
+    for s in state.get("settlers", []):
+        s.setdefault("arrive_day", max(0, state["turn"] - s.get("age", 0)))
 
 
 def rng_from(state):
@@ -4995,14 +4997,23 @@ def _cmd_status(state):
     # 免得玩家在"顶级捕食者"里找不到水蛇之类的常驻生灵（item 7）
     if state.get("settlers"):
         lines.append("─ 定居者 ─（独立个体，不计入上方种群）")
+        # 统计每种定居者的数量，用于区分多只同种
+        species_counts = {}
         for s in state["settlers"]:
+            species_counts[s["name"]] = species_counts.get(s["name"], 0) + 1
+        for s in state["settlers"]:
+            label = _settler_label(s)
+            # 显示到达时间前缀
+            arrive_day = s.get("arrive_day", 0)
+            label = "[D-%d] %s" % (arrive_day, label)
+            # 状态标签
             if s.get("juvenile"):
                 tag = "幼体"
             elif s.get("hibernating"):
                 tag = "冬眠中"
             else:
-                tag = "第%d天" % s["age"]
-            lines.append("  %s · %s · %s" % (_settler_label(s), tag, _health_word(s["health"])))
+                tag = "居 %d 天" % s["age"]
+            lines.append("  %s · %s · %s" % (label, tag, _health_word(s["health"])))
     # 持续灾害提示
     aw = state.get("active_weather")
     if aw:
@@ -5452,20 +5463,25 @@ def _cmd_import(state, args):
 
 
 def _cmd_name(state, args):
-    """给定居者取名（补一·6）：name [定居者/旧昵称] [新昵称]。"""
-    if len(args) < 2:
-        return "用法：name [定居者] [昵称]，例如 name 翠鸟 小蓝"
-    target = args[0].strip()
-    nick = " ".join(args[1:]).strip()
+    """给定居者取名：name [D-N] 物种 昵称，例如 name [D-5] 翠鸟 小蓝"""
+    if len(args) < 3:
+        return "用法：name [D-N] 物种 昵称，例如 name [D-5] 翠鸟 小蓝（[D-N] 见 status）"
+    # 解析 [D-N] 前缀
+    if not (args[0].startswith("[D-") and args[0].endswith("]")):
+        return "用法：name [D-N] 物种 昵称，例如 name [D-5] 翠鸟 小蓝（[D-N] 见 status）"
+    try:
+        arrive_day = int(args[0][3:-1])
+    except ValueError:
+        return "用法：name [D-N] 物种 昵称，例如 name [D-5] 翠鸟 小蓝（[D-N] 见 status）"
+    target = args[1].strip()
+    nick = " ".join(args[2:]).strip()
     settlers = state.get("settlers", [])
-    # 优先匹配现有昵称，其次物种名
-    cand = [s for s in settlers if s.get("nickname") == target]
+    
+    # 按 [D-N] + 物种名精确匹配
+    cand = [s for s in settlers if s["name"] == target and s.get("arrive_day") == arrive_day]
     if not cand:
-        cand = [s for s in settlers if s["name"] == target]
-    if not cand:
-        return "池塘里没有叫「%s」的定居者。（status 可查看在塘定居者）" % target
-    # 多只同种：取第一只还没有昵称的，否则第一只
-    s = next((x for x in cand if not x.get("nickname")), cand[0])
+        return "池塘里没有第%d天来的「%s」。（status 可查看 [D-N]）" % (arrive_day, target)
+    s = cand[0]
     s["nickname"] = nick
     return "🏷 从此，这只%s有了名字：%s。" % (s["name"], _settler_label(s))
 
@@ -5556,7 +5572,7 @@ def _help_text():
         "  encyclopedia     图鉴与成就。\n"
         "  look 物种/季节/访客 查看详细信息。\n"
         "  trends           近 30 天趋势折线图（物种总量/溶氧/营养盐）。\n"
-        "  name 定居者 昵称 给定居者取名（如 name 翠鸟 小蓝）。\n"
+        "  name [D-N] 物种 昵称 给定居者取名（如 name [D-5] 翠鸟 小蓝，[D-N] 见 status）。\n"
         "  export [lite|story] 导出存档为 base64（lite 精简版 / story 年度故事）。\n"
         "  import_save 串   从 base64 字符串恢复存档。\n"
         "  new [seed]       重开一局。\n"
