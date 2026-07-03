@@ -91,7 +91,7 @@ SPECIES = {
     "水蚤": {
         # 核心饲料生物：全场最高繁殖率 + 大承载量，数量震荡最明显
         "space": "水中", "trophic": "primary",
-        "birth_rate": 0.55, "death_rate": 0.12, "max_capacity": 1000,
+        "birth_rate": 0.55, "death_rate": 0.11, "max_capacity": 1000,
         "food_sources": ["水藻"], "predation": 0.0006, "init": 100,
     },
     "田螺": {
