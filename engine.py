@@ -1282,6 +1282,43 @@ VISITOR_MISS = {
 }
 
 # ---------------------------------------------------------------------------
+# 2h-bis. 隐藏物种极端状态提示文案（一次性触发，用 flags 控制）
+# ---------------------------------------------------------------------------
+
+_HIDDEN_HINTS = {
+    "mosquito_high": [
+        "傍晚，一团蚊蚋从芦苇丛上方升起，比昨天密了一倍。它们在水面上空织成一片薄雾，嗡鸣声盖过了蛙叫。",
+        "水面上的孑孓密密麻麻，尾巴朝上轻轻摆动，把浅水区搅得微微发颤。它们太挤了，有的被挤到了水草叶子上。",
+        "蚊子在暮色里聚成柱状，在水面上方旋转。空气里全是细密的嗡鸣，池塘像是被一层会叫的薄纱罩住了。",
+    ],
+    "mosquito_low": [
+        "傍晚很安静。水面上的孑孓稀稀落落，几只在浅水处扭动，扭动的幅度也小，像是没有力气。",
+        "夜色降临，空中没有升起那团熟悉的蚊蚋。水面空荡荡的，只有风在上面画纹。",
+        "芦苇丛边没有蚊子盘旋。蜻蜓在水面上空飞了好几圈，喙里始终是空的。",
+    ],
+    "dragonfly_high": [
+        "芦苇枝头停满了蜻蜓，一根枯茎上歇着三四只。风一过，它们同时振翅，空中全是闪光的薄翼。",
+        "蜻蜓在水面上空盘旋，密度比平时大了许多。它们互相追逐，偶尔撞在一起，发出细小的翅翼摩擦声。",
+        "空中到处是蜻蜓掠过的影子。它们飞得很低，翅膀在光下闪成一片细碎的虹彩，水面被它们的俯冲搅得没有一刻平静。",
+    ],
+    "dragonfly_low": [
+        "芦苇枝头空落落的。往年这个时候总有蜻蜓停在上面晒翅膀，今年只有风穿过枯茎的声音。",
+        "水面上空很冷清。一只蜻蜓孤零零地盘旋了半圈，落在芦苇尖上，翅膀合拢，很久没有飞起来。",
+        "蜻蜓幼虫在水底伏了很久，但水面上再也没有出现它们羽化后的影子。空中那片闪光的薄翼消失了。",
+    ],
+    "bacteria_high": [
+        "底泥里不停地冒着气泡，一串接一串，在水面碎成黏稠的浮沫。水底像在发酵，腐气从淤泥深处往上翻涌。",
+        "水色发浑，不是泥沙的那种浑，而是一种黏糊糊的白浊。石头和水草上都蒙着一层滑腻的膜。",
+        "水面聚着一层细密的白泡，堆在岸边和水草周围，风吹不散。水底积着厚厚一层絮状的沉淀，微微颤动。",
+    ],
+    "bacteria_low": [
+        "水底的碎屑积了很久，还是原来的样子。落叶沉在泥里，边缘完整，没有被分解的痕迹。",
+        "水色清得不正常。不是清澈的清，是一种没有生命的清——水底什么都在，但什么都不在变化。",
+        "泥面上静悄悄的。那些细小的分解者似乎消失了，腐叶堆在那里，不再继续腐烂，像是在等什么。",
+    ],
+}
+
+# ---------------------------------------------------------------------------
 # 2i. 物种归零回忆描写（chronicle 在归零记录旁追加，每种 1 句）
 # ---------------------------------------------------------------------------
 
@@ -3616,6 +3653,51 @@ def _random_events(state, events, r, season):
         bloom_hit = bloom_hit or vis(0.2 * bloom_x2)
     if bloom_hit and can_choose() and _choice_ready(state, "水华"):
         _trigger_choice(state, events, "水华")
+
+    # ---- 隐藏物种极端状态提示（条件满足时触发，恢复正常后可再次触发） ----
+    flags = state["flags"]
+    mosq = pop.get("蚊子", 0)
+    dfl_adult = pop.get("蜻蜓成虫", 0)
+    bact = pop.get("细菌", 0)
+
+    if mosq > 400:
+        if not flags.get("hint_mosquito_high"):
+            flags["hint_mosquito_high"] = True
+            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["mosquito_high"]))
+    else:
+        flags.pop("hint_mosquito_high", None)
+    if 0 < mosq < 30:
+        if not flags.get("hint_mosquito_low"):
+            flags["hint_mosquito_low"] = True
+            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["mosquito_low"]))
+    else:
+        flags.pop("hint_mosquito_low", None)
+
+    if dfl_adult > 50:
+        if not flags.get("hint_dragonfly_high"):
+            flags["hint_dragonfly_high"] = True
+            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["dragonfly_high"]))
+    else:
+        flags.pop("hint_dragonfly_high", None)
+    if 0 < dfl_adult < 5:
+        if not flags.get("hint_dragonfly_low"):
+            flags["hint_dragonfly_low"] = True
+            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["dragonfly_low"]))
+    else:
+        flags.pop("hint_dragonfly_low", None)
+
+    if bact > 1500:
+        if not flags.get("hint_bacteria_high"):
+            flags["hint_bacteria_high"] = True
+            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["bacteria_high"]))
+    else:
+        flags.pop("hint_bacteria_high", None)
+    if 0 < bact < 100:
+        if not flags.get("hint_bacteria_low"):
+            flags["hint_bacteria_low"] = True
+            events.append("visitor_implicit:" + _pick_t(state, _HIDDEN_HINTS["bacteria_low"]))
+    else:
+        flags.pop("hint_bacteria_low", None)
 
 
 # 季节性自然归零：这些物种在对应季节归零属正常季节更替，只在 wait 摘要里体现，
