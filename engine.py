@@ -637,7 +637,7 @@ CHOICE_EVENTS = {
     "干旱": {
         "desc": "日光一天天晒着，水面缓慢退下，露出一圈干裂的泥岸。",
         "requires": [],
-        "choices": ["引水补充", "静观其变"],
+        "choices": ["下雨", "静观其变"],
         "title": "干旱",
     },
     "热浪": {
@@ -1202,6 +1202,11 @@ WEATHER_ONGOING = {
         "水位猛涨，岸的界线消失了。洪水带着泥沙灌进来，水底的一切都被搅了起来。",
         "洪水汹涌，池塘变成浑黄一片。什么都在漂，什么都站不住。",
     ],
+    "下雨": [
+        "雨丝细细地落进水里，水面泛起密密的涟漪。池塘在慢慢喝饱。",
+        "雨还在下。空气凉了下来，水面涨了一点点，鱼群游得比昨天自在了些。",
+        "雨声不断。水线一点点爬回泥岸，干裂的纹路重新被水淹没，池塘在恢复。",
+    ],
 }
 
 # ---------------------------------------------------------------------------
@@ -1599,6 +1604,7 @@ WEATHER_SPEC = {
     "热浪": {"min": 3, "max": 5},
     "暴雨": {"min": 1, "max": 2},
     "洪水": {"min": 2, "max": 3},
+    "下雨": {"min": 3, "max": 5},
 }
 
 _WEATHER_END = {
@@ -1606,6 +1612,7 @@ _WEATHER_END = {
     "热浪": "热浪过去了。夜里起了风，水面第一次有了凉意，水温一点点退下来。",
     "暴雨": "雨停了。浑浊的水面慢慢沉淀，泥沙落回水底，只是营养盐留在了水里。",
     "洪水": "洪水退去了。水位落回原处，岸边的界线重新显现，只是池塘已经不是原来的样子。",
+    "下雨": "雨停了。水面涨回来一些，空气里还留着潮湿的泥土气息，池塘安静了下来。",
 }
 
 
@@ -1666,6 +1673,13 @@ def _process_weather(state, events):
         env["turbidity"] = _clamp(env["turbidity"] + 0.3 * sev, 0.0, 1.0)
         env["nutrients"] += 30 * sev
         env["detritus"] += 25 * sev
+    elif kind == "下雨":
+        # 下雨天气：缓慢恢复水位和溶氧，前期温和后期明显
+        env["water_temp"] = _clamp(env["water_temp"] - 0.3, 0.0, 40.0)
+        # 溶氧恢复：前2天+0.15，之后+0.25
+        gain = 0.15 if day <= 2 else 0.25
+        env["dissolved_oxygen"] = min(10.0, env["dissolved_oxygen"] + gain)
+        env["nutrients"] += 0.5
     # 进行中的专属描写（weather 标签：不强制暂停 wait）
     events.append("weather:" + _pick_t(state, WEATHER_ONGOING[kind]))
     ended = day >= aw["duration"]
@@ -2051,6 +2065,10 @@ def _process_disease(state, events, r):
     for name in list(diseases.keys()):
         d = diseases[name]
         d["elapsed"] += 1
+        # 宿主归零则提前终止疫病，不再生成文案
+        if pop.get(name, 0) < 0.5:
+            ended.append(name)
+            continue
         day = d["elapsed"]
         sp = SPECIES[name]
         if day <= 2:
@@ -2993,14 +3011,19 @@ def _settler_hunt(state, s, hunter, events, r):
                         pop[p] = max(0.0, pop[p] - 1)
                         caught = p
                         break
-                s["health"] = round(min(1.0, s["health"] + 0.1), 3)
-                s["since_hunt"] = 0
-                if s["name"] == "翠鸟" and caught == "鳑鲏":
-                    _hunt_emit(state, s, events, r, KINGFISHER_HIT_PANGPI, "hit")
-                elif s["name"] == "苍鹭" and caught == "草鱼":
-                    _hunt_emit(state, s, events, r, HERON_HIT_GRASS_CARP, "hit")
+                if caught is None:
+                    # 概率成功但猎物均为浮点残余，降级为扑空
+                    _hunt_emit(state, s, events, r, miss_arr, "miss")
+                    s["since_hunt"] = s.get("since_hunt", 0) + 1
                 else:
-                    _hunt_emit(state, s, events, r, hit_arr, "hit")
+                    s["health"] = round(min(1.0, s["health"] + 0.1), 3)
+                    s["since_hunt"] = 0
+                    if s["name"] == "翠鸟" and caught == "鳑鲏":
+                        _hunt_emit(state, s, events, r, KINGFISHER_HIT_PANGPI, "hit")
+                    elif s["name"] == "苍鹭" and caught == "草鱼":
+                        _hunt_emit(state, s, events, r, HERON_HIT_GRASS_CARP, "hit")
+                    else:
+                        _hunt_emit(state, s, events, r, hit_arr, "hit")
             else:
                 first_available = next((p for p in prey_list if pop.get(p, 0) >= 1), None)
                 if s["name"] == "翠鸟" and first_available == "鳑鲏":
@@ -3340,10 +3363,13 @@ def _resolve_choice(state, pc, idx, events):
     elif key == "干旱":
         # 干旱改为持续 5-7 天的过程：水位缓降、溶氧逐步降低，后几天才影响死亡率
         state["flags"]["experienced_drought"] = True  # 标记经历过干旱（蟾蜍解锁）
-        _start_weather(state, "干旱", idx == 1)
         if idx == 1:
-            msg = "你引来新水补充。水线暂时稳住，但日头还晒着，焦渴只是被缓了缓。"
+            # 选择下雨：触发下雨天气，缓慢恢复水位和溶氧
+            _start_weather(state, "下雨", False)
+            msg = "雨落了下来。细细的雨丝打在干裂的泥岸上，池塘一点点喝饱，水线开始回升。"
         else:
+            # 选择静观其变：触发干旱天气
+            _start_weather(state, "干旱", False)
             msg = "你选择静观其变。日光一天天晒着，水线开始一点点往下退。"
     elif key == "热浪":
         # 热浪改为持续 3-5 天的过程：水温逐日升高、溶氧逐日降低，末日可能翻塘
@@ -4112,7 +4138,7 @@ _CHOICE_KEYWORDS = [
     ("野鸭", "野鸭定居"),
     ("水蛇", "水蛇来访"), ("苍鹭", "苍鹭来访"), ("水獭", "水獭来访"),
     ("乌龟", "流浪乌龟来访"), ("龟", "流浪乌龟来访"),
-    ("干裂", "干旱"), ("水线", "干旱"), ("引来新水", "干旱"), ("焦渴", "干旱"),
+    ("干裂", "干旱"), ("水线", "干旱"), ("下雨", "干旱"), ("焦渴", "干旱"),
     ("热", "热浪"),
     ("雨", "暴雨"), ("泥沙", "暴雨"), ("堤岸", "暴雨"),
 ]
