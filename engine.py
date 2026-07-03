@@ -678,7 +678,7 @@ CHOICE_EVENTS = {
         "title": "野鸭定居",
     },
     "翠鸟定居": {
-        "desc": "这是翠鸟第五次停在那根枯枝上了。今天它没有急着俯冲，而是歪着头，打量着枝杈间的位置。",
+        "desc": "翠鸟又一次停在那根枯枝上。今天它没有急着俯冲，而是歪着头，打量着枝杈间的位置。",
         "requires": [],
         "choices": ["让它留下筑巢", "让它自行决定"],
         "title": "翠鸟定居",
@@ -3517,15 +3517,15 @@ def _random_events(state, events, r, season):
             and can_choose() and _choice_ready(state, "流浪乌龟"):
         _trigger_choice(state, events, "流浪乌龟", desc_override=_pair_desc(state, "流浪乌龟", "流浪乌龟"))
 
-    # 传说级访客 ~0.05%/天
-    if vis(0.0005):
+    # 传说级访客 ~0.1%/天
+    if vis(0.001):
         events.append("legend:满月之夜，无数萤火从草丛升起，水面落满流动的光。")
         _folio_bump(state, "events", "萤火虫大爆发", "纯观赏奇景")
         _chain_set(state, "bat_x3", 1)  # 连锁：次日蝙蝠出现概率 ×3
         _unlock(state, events, "萤光之夜")
-    if vis(0.0005) and can_choose() and _choice_ready(state, "水獭"):  # 水獭 —— 决策
+    if vis(0.001) and can_choose() and _choice_ready(state, "水獭"):  # 水獭 —— 决策
         _trigger_choice(state, events, "水獭")
-    duck_p = 0.001 if season in ("春", "秋") else 0.0005
+    duck_p = 0.002 if season in ("春", "秋") else 0.001
     if vis(duck_p):
         state["flags"]["duck_visits"] = state["flags"].get("duck_visits", 0) + 1
         if state["flags"]["duck_visits"] >= 3 and _can_invite_settler(state, "野鸭") \
@@ -3579,7 +3579,7 @@ def _random_events(state, events, r, season):
     if season != "冬" and vis(0.03) and can_choose() and _choice_ready(state, "白鹭"):
         _trigger_choice(state, events, "白鹭")
     # 仙鹤（传说级 ~0.05%，冬春；纯观赏，解锁成就）
-    if season in ("冬", "春") and vis(0.0005):
+    if season in ("冬", "春") and vis(0.001):
         events.append("legend:薄雾中，一只仙鹤立在水边，长颈微曲，一动不动。"
                       "水面映着它的倒影，像一幅不真实的水墨。片刻后，它展开翅，慢慢消失在雾里。")
         _folio_bump(state, "visitors", "仙鹤", "纯观赏奇景")
