@@ -149,8 +149,8 @@ SPECIES = {
     "草鱼": {
         # 大型草食鱼：强力压制浮萍，但排泄多、耗氧高，会把清水管理推向肥水风险
         "space": "水中", "trophic": "primary",
-        "birth_rate": 0.035, "death_rate": 0.035, "max_capacity": 18,
-        "food_sources": ["浮萍", "睡莲"], "predation": 0.0014, "init": 0,
+        "birth_rate": 0.06, "death_rate": 0.035, "max_capacity": 20,
+        "food_sources": ["浮萍", "睡莲"], "predation": 0.011, "init": 0,
         "food_efficiency": {"浮萍": 1.0, "睡莲": 0.25},
         "needs_oxygen": True, "turbidity_per_day": 0.003, "excretion_rate": 0.03,
     },
