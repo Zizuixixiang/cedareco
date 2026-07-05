@@ -2931,6 +2931,10 @@ def _archive_settler_life(state, s, reason):
         del rec["residents"][:len(rec["residents"]) - SETTLER_RESIDENT_LIMIT]
 
 
+# 所有可能通过 _add_settler 落户的物种（与下方各事件调用点保持一致）。
+SETTLER_SPECIES = {"水蛇", "流浪乌龟", "螃蟹", "野鸭", "翠鸟", "苍鹭"}
+
+
 def _add_settler(state, name):
     """收留一名定居者，加入列表并登记定居者志。"""
     t = SETTLER_TYPES[name]
@@ -5513,24 +5517,55 @@ def _cmd_import(state, args):
 
 
 def _cmd_name(state, args):
-    """给定居者取名：name [D-N] 物种 昵称，例如 name [D-5] 翠鸟 小蓝"""
-    if len(args) < 3:
-        return "用法：name [D-N] 物种 昵称，例如 name [D-5] 翠鸟 小蓝（[D-N] 见 status）"
-    # 解析 [D-N] 前缀
-    if not (args[0].startswith("[D-") and args[0].endswith("]")):
-        return "用法：name [D-N] 物种 昵称，例如 name [D-5] 翠鸟 小蓝（[D-N] 见 status）"
-    try:
-        arrive_day = int(args[0][3:-1])
-    except ValueError:
-        return "用法：name [D-N] 物种 昵称，例如 name [D-5] 翠鸟 小蓝（[D-N] 见 status）"
-    target = args[1].strip()
-    nick = " ".join(args[2:]).strip()
+    """给定居者取名。三种写法：
+    name [D-N] 物种 昵称（完整）
+    name 物种 昵称（该物种只有一位定居者时可省略 [D-N]）
+    name [D-N] 昵称（该天只来了一位定居者时可省略物种）"""
+    usage = ("用法：name [D-N] 物种 昵称，例如 name [D-5] 翠鸟 小蓝；"
+             "同物种只有一位定居者时可省略 [D-N]，如 name 翠鸟 小蓝（[D-N] 见 status）")
+    if len(args) < 2:
+        return usage
     settlers = state.get("settlers", [])
-    
-    # 按 [D-N] + 物种名精确匹配
-    cand = [s for s in settlers if s["name"] == target and s.get("arrive_day") == arrive_day]
-    if not cand:
-        return "池塘里没有第%d天来的「%s」。（status 可查看 [D-N]）" % (arrive_day, target)
+    if args[0].startswith("[D-") and args[0].endswith("]"):
+        try:
+            arrive_day = int(args[0][3:-1])
+        except ValueError:
+            return usage
+        rest = args[1:]
+        # 可能成为定居者的物种全集 + 当前存档里实际出现过的名字，
+        # 用于区分「[D-N] 物种 昵称」和「[D-N] 昵称」两种写法。
+        known_names = SETTLER_SPECIES | {s["name"] for s in settlers}
+        if len(rest) >= 2 and rest[0].strip() in known_names:
+            # name [D-N] 物种 昵称
+            target = rest[0].strip()
+            nick = " ".join(rest[1:]).strip()
+            cand = [s for s in settlers
+                    if s["name"] == target and s.get("arrive_day") == arrive_day]
+            if not cand:
+                return "池塘里没有第%d天来的「%s」。（status 可查看 [D-N]）" % (arrive_day, target)
+        else:
+            # name [D-N] 昵称
+            nick = " ".join(rest).strip()
+            cand = [s for s in settlers if s.get("arrive_day") == arrive_day]
+            if not cand:
+                return "池塘里没有第%d天来的定居者。（status 可查看 [D-N]）" % arrive_day
+            if len(cand) > 1:
+                opts = "、".join(s["name"] for s in cand)
+                return ("第%d天来的定居者不止一位（%s），请写明物种：name [D-%d] 物种 昵称。"
+                        % (arrive_day, opts, arrive_day))
+    else:
+        # name 物种 昵称
+        target = args[0].strip()
+        nick = " ".join(args[1:]).strip()
+        cand = [s for s in settlers if s["name"] == target]
+        if not cand:
+            return "池塘里没有定居者「%s」。（status 可查看定居者）" % target
+        if len(cand) > 1:
+            opts = "、".join("[D-%d]" % s.get("arrive_day", 0) for s in cand)
+            return ("池塘里有 %d 位「%s」（%s），请带上编号：name [D-N] %s 昵称。"
+                    % (len(cand), target, opts, target))
+    if not nick:
+        return usage
     s = cand[0]
     s["nickname"] = nick
     return "🏷 从此，这只%s有了名字：%s。" % (s["name"], _settler_label(s))
@@ -5622,7 +5657,7 @@ def _help_text():
         "  encyclopedia     图鉴与成就。\n"
         "  look 物种/季节/访客 查看详细信息。\n"
         "  trends           近 30 天趋势折线图（物种总量/溶氧/营养盐）。\n"
-        "  name [D-N] 物种 昵称 给定居者取名（如 name [D-5] 翠鸟 小蓝，[D-N] 见 status）。\n"
+        "  name [D-N] 物种 昵称 给定居者取名（如 name [D-5] 翠鸟 小蓝；同物种仅一位时可省略 [D-N]，如 name 翠鸟 小蓝）。\n"
         "  export [lite|story] 导出存档为 base64（lite 精简版 / story 年度故事）。\n"
         "  import_save 串   从 base64 字符串恢复存档。\n"
         "  new [seed]       重开一局。\n"
