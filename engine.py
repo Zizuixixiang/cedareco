@@ -2091,10 +2091,14 @@ def _process_biological_disasters(state, events, r):
 
     rat = bio.get("鼠患")
     if rat:
+        if pop.get("田鼠", 0) < 1:
+            bio.pop("鼠患", None)
+            return
         rat["remaining"] -= 1
-        pop["芦苇"] *= 0.80
-        env["turbidity"] = _clamp(env["turbidity"] + 0.15, 0.0, 1.0)
-        events.append("disaster:" + _pick(r, DISASTER_TEXT["鼠患"]["daily"]))
+        if pop.get("田鼠", 0) > 5:
+            pop["芦苇"] *= 0.80
+            env["turbidity"] = _clamp(env["turbidity"] + 0.15, 0.0, 1.0)
+            events.append("disaster:" + _pick(r, DISASTER_TEXT["鼠患"]["daily"]))
         if rat["remaining"] <= 0:
             bio.pop("鼠患", None)
     elif pop.get("田鼠", 0) > 15:
@@ -4154,9 +4158,18 @@ def _resolve_choice(state, pc, idx, events):
         if idx == 1:
             msg = "你扬起手臂，白鹭展翅而起，修长的身影划过水面，飞远了。"
         else:
-            pop["泥鳅"] = max(0.0, pop.get("泥鳅", 0) - 2)
-            pop["河蚌"] = max(0.0, pop.get("河蚌", 0) - 1)
-            msg = "白鹭从容地翻出一只河蚌，又叼走两条泥鳅，在浅水里留下一串清晰的爪印。"
+            parts = []
+            if pop.get("河蚌", 0) >= 1:
+                pop["河蚌"] = max(0.0, pop.get("河蚌", 0) - 1)
+                parts.append("翻出一只河蚌")
+            if pop.get("泥鳅", 0) >= 1:
+                loss = min(2, int(pop.get("泥鳅", 0)))
+                pop["泥鳅"] = max(0.0, pop.get("泥鳅", 0) - loss)
+                parts.append("叼走%d条泥鳅" % loss)
+            if parts:
+                msg = "白鹭从容地%s，在浅水里留下一串清晰的爪印。" % "，又".join(parts)
+            else:
+                msg = "白鹭在浅水里翻找了很久，什么也没找到，最终展开白翅飞远了。"
     elif key == "洪水":
         if idx == 1:
             msg = "你加固了堤岸，洪水被挡在外面。池塘保住了，但也拒绝了河水带来的新生命。"
@@ -4493,7 +4506,8 @@ def _random_events(state, events, r, season):
         events.append("visitor:几只燕子贴着水面掠过去，速度快得像几道黑线。蚊子少了一片。")
         _folio_bump(state, "visitors", "燕子", "捕食蚊子")
     # 白鹭（少见 ~3%，春夏秋；需决策，需泥鳅或河蚌在场）
-    if season != "冬" and vis(0.03) and can_choose() and _choice_ready(state, "白鹭"):
+    if season != "冬" and (pop.get("泥鳅", 0) >= 1 or pop.get("河蚌", 0) >= 1) \
+            and vis(0.03) and can_choose() and _choice_ready(state, "白鹭"):
         _trigger_choice(state, events, "白鹭")
     # 仙鹤（传说级 ~0.1%，冬春；雾天概率 ×3；纯观赏，解锁成就）
     if season in ("冬", "春") and vis(0.001 * (3.0 if _weather(state) == "雾" else 1.0)):
