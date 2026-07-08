@@ -147,7 +147,7 @@ SPECIES = {
     },
     # ---- V1.0 扩展：新增 7 种常驻 ----
     "草鱼": {
-        # 大型草食鱼：强力压制浮萍，但排泄多、耗氧高，会把清水管理推向肥水风险
+        # 大型草食鱼：强力压制浮萍，也会啃食水葫芦；排泄多、耗氧高，会把清水管理推向肥水风险
         "space": "水中", "trophic": "primary",
         "birth_rate": 0.06, "death_rate": 0.035, "max_capacity": 20,
         "food_sources": ["浮萍", "睡莲"], "predation": 0.011, "init": 0,
@@ -1100,7 +1100,7 @@ GAZE_FISH_HIDE = {
 LOOK_DESC = {
     "鲫鱼": "杂食鱼，吃水蚤也啃水藻。身子侧扁，银鳞闪亮，成群游动。",
     "鲤鱼": "大型杂食鱼，拱翻底泥找食，也吃小鱼。每一次翻身都搅浑一片水。",
-    "草鱼": "大型草食鱼，吃浮萍和嫩叶。能清开被绿毯封死的水面，但吃得多排得也多——水会因此更肥、更闷。",
+    "草鱼": "大型草食鱼，吃浮萍、睡莲嫩叶，也啃水葫芦嫩叶。能清开被绿毯封死的水面，但吃得多排得也多——水会因此更肥、更闷。",
     "鳑鲏": "小型浅水鱼，吃水藻。喜欢在水草和河蚌附近活动。银鳞闪亮，翠鸟最容易叼到的就是它。",
     "泥鳅": "底栖鱼，在淤泥里钻行，吃有机碎屑和孑孓。身子滑溜，胡须探路。",
     "淡水虾": "底栖杂食，躲石缝，碎屑多时现身。身子透明，遇险就弹走。",
@@ -3203,6 +3203,14 @@ def _apply_special_effects(state, events, r):
         dec = min(env["detritus"], 1.0 * min(1.0, w / 100.0))
         env["detritus"] -= dec
         env["nutrients"] += dec * 0.5
+    # 草鱼会啃食水葫芦嫩叶，但效率低于压制浮萍：少量草鱼只能延缓蔓延。
+    hy = state["flags"].get("water_hyacinth")
+    grass = pop.get("草鱼", 0)
+    if isinstance(hy, dict) and grass >= 1 and state["turn"] >= hy.get("day", 0) + 3:
+        grazed = min(hy.get("cover", 0.0), 0.004 * min(grass, 8.0))
+        if grazed > 0:
+            hy["cover"] = max(0.0, hy.get("cover", 0.0) - grazed)
+            pop["草鱼"] = min(SPECIES["草鱼"]["max_capacity"], pop["草鱼"] + grazed * 6.0)
 
 
 def _update_streaks(state):
