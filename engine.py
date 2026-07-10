@@ -397,6 +397,39 @@ SETTLER_TEXT = {
     },
 }
 
+LONGEVITY_LEAVE_TEXT = {
+    "翠鸟": [
+        "那道蓝影最后一次扎进水里，力道比年轻时轻了很多。但枯枝上它待过的痕迹，比任何一只都深。它多看了好几个春天。",
+        "翠鸟飞走那天，羽尖的蓝已经淡得发白。它在枝头多停了一会儿，比所有的同类都停得久。池塘留了它很久。",
+        "枯枝空出来的时候，上面有一层薄薄的旧羽屑。它在风里站过的日子，比其他翠鸟多了整整一段。",
+    ],
+    "苍鹭": [
+        "浅水处那双细腿站了太久，水底的泥里踩出了一对深坑。它走的时候，那对坑还在。比其他苍鹭多守了好几个雨季。",
+        "苇丛里的苍鹭收起长腿，最后一次从水面滑过。影子拖得很长，比其他影子都长。池塘的水位记得它。",
+        "老苍鹭单腿立到暮色尽头才展翅。这一片浅滩，它比任何一只都熟悉，也比任何一只都待得久。风来的时候，它才松开。",
+    ],
+    "水蛇": [
+        "石缝里的鳞光滑过最后一圈，比记忆里慢了太多。它比其他水蛇多蜕了好几次皮，池塘的水温它最清楚。",
+        "芦苇根上缠过的痕迹松开了。那条水蛇在走之前，比同类多盘了几个冬天。水面最后一道信子波纹，散得很慢。",
+        "老水蛇从石缝探出头，看了池塘最后一眼。它认得这里比任何一条都久，游过的每一条水道都刻在鳞片上。",
+    ],
+    "流浪乌龟": [
+        "石头上那只壳晒过的太阳，比所有的壳都多。它最后一次趴下时，光斑挪得很慢。池塘给了它多出来的年份。",
+        "老龟从石头上慢慢滑进水里，动作比从前轻了很多。它在池塘的日子里，比同类多出了好几轮春秋。壳上的纹路装满了。",
+        "年迈的流浪乌龟在一个清晨沉入水底，再也没有浮上来。但它趴过的石头，印子比任何一只都深。",
+    ],
+    "野鸭": [
+        "水面最后一道涟漪从老野鸭身下荡开。它比其他鸭子多浮了好几个冬天。池塘的倒影里，它的位置空得最慢。",
+        "野鸭最后一次把头埋进翅膀，埋的还是那一侧。它在这片水面漂过的日子，比别的鸭子都长出一截。风推了它很久才离开。",
+        "老野鸭从水面起飞时，水花溅得比从前大。它多看了几轮池塘的冰融，走的时候水还是暖的。",
+    ],
+    "螃蟹": [
+        "岸边洞口那只螯最后举了一下，比从前慢。它在沙地上横行过的年份，比其他螃蟹都多。步足孔从密到疏，走了很长的路。",
+        "老螃蟹退回洞穴，再也没有横着出来。它的螯接过的晨光，比任何一只都多。潮线上那排孔，有一行特别深。",
+        "沙地上多了一个不再打开的洞口。那只螃蟹比其他同类多蜕了好几轮壳，旧壳还散在岸边各处。池塘的泥沙记得它。",
+    ],
+}
+
 SETTLER_RETURN_TEXT = {
     "翠鸟": [
         "{nickname}落在旧枝上，偏头看了看水面。那道蓝影比记忆中轻了些。",
@@ -1880,6 +1913,7 @@ def _migrate(state):
         s.setdefault("arrive_day", max(0, state["turn"] - s.get("age", 0)))
         s.setdefault("return_records", [])
         s.setdefault("descendant_of", None)
+        s.setdefault("high_health_days", 0)
     _migrate_settler_residents(state)
     _migrate_settler_kinship(state)
 
@@ -1947,6 +1981,7 @@ def _migrate_settler_residents(state):
                 life["return_eligible"] = False
             life.setdefault("return_records", [])
             life.setdefault("descendant_of", None)
+            life.setdefault("high_health_days", 0)
 
 
 def _settler_id_number(value):
@@ -3558,15 +3593,98 @@ PAIR_SETTLE_TEXT = {
     ],
 }
 
+TRIO_CHOICE_DESC = {
+    "翠鸟定居": [
+        "枯枝上又落下一道蓝影。原来的两只同时偏头，新来的停在最低的那根岔枝上。三只翠鸟，谁也没有先动。",
+        "新蓝影的羽色比那两只深。它盯着水面，但那两只盯的是它。枯枝上三截蓝，中间隔着好几道空枝。",
+        "风从旧方向来。两只翠鸟的羽整齐地顺过去，新来的那一只逆风站着，羽尖翘起的形状不一样。",
+    ],
+    "苍鹭定居": [
+        "浅水处多了第三双腿。原来的两只从苇丛深处探出头，新来的站在水边，腿没放进水里。三只苍鹭，各自定住。",
+        "新来的苍鹭选了离苇丛最远的那片浅滩。风把它的冠羽吹起来，另外两只在暗处看着。水面三道细长的倒影，各朝各的方向。",
+        "苇丛边多了一道灰影。两只老住户把颈子收得更深了，新来的那只把喙慢慢低下水。距离刚好能看清，刚好够不着。",
+    ],
+    "蛇": [
+        "芦苇根丛里多了一截陌生的鳞光。两条水蛇从石缝探出信子，新来的盘在另一侧的根上。三颗头在水面划出三组细纹，方向都朝着彼此。",
+        "新来的水蛇从池塘另一侧滑入，绕过旧日的那丛芦苇。石缝里两只蛇信颤动的频率变了。水面三道细痕，慢慢拉近。",
+        "水底的石缝满员了。新来的缠上一根单独的水草，另外两条在暗处盘紧了些。信子探出的间隔变长了。",
+    ],
+    "流浪乌龟": [
+        "晒太阳的石头上来了第三只龟。原来的两只趴在石头两端，新来的把前脚搭上石沿，试了两次没上去。壳上的花纹不一样。",
+        "两只老住户占满了石头。新来的流浪乌龟在岸边泥地上趴下，伸长脖子看了看石头上的两只，然后把头慢慢缩回去一半。",
+        "石头上壳挨壳，中间只够放一只脚。新来的绕到石头背面，找了一块碎光斑趴下来。三只龟，两处晒。",
+    ],
+    "野鸭": [
+        "水面浮起第三圈涟漪。两只老野鸭靠在一起，新来的在几尺外停下。三只鸭子漂着，谁也不先靠近。",
+        "新来的野鸭落水时溅起的水花大了些。原来的两只把喙从翅膀下抽出来，看了一会儿。新来的把尾羽翘起来抖了抖。",
+        "两只老住户在池塘东角浮着。新来的从西侧滑入，划出的水痕到中间就停了。池塘被分成了两片安静。",
+    ],
+    "螃蟹": [
+        "岸边多了一个新洞口。两只老螃蟹横着走过沙地，在新洞口停了一下，螯微微举起。洞里有东西在动。",
+        "新来的螃蟹从水里横着上岸，走几步就停一下。原来的两只在各自的洞口侧身站着，新来的在中间那片空沙地上举起了螯。",
+        "沙地上多了第三行步足孔。两行旧的密密麻麻挨在一起，新的那行绕开了。三只螃蟹，各有各的洞口，螯都朝着中间。",
+    ],
+}
+
+TRIO_SETTLE_TEXT = {
+    "翠鸟": [
+        "枯枝上三截蓝影，高低错开。最上面的那只梳理羽毛，中间的盯着水面，新来的在最下面一根枝上，爪尖攥得很稳了。",
+        "三只翠鸟各守一片水域。扎水的声音此起彼落，谁的空手都不影响谁。枯枝承着三份重量，沉下去一些。",
+        "风从旧方向来。两只翠鸟的羽顺过去，新来的那一只终于也转了身。三只蓝影，羽尖朝同一个方向轻轻晃动。",
+    ],
+    "苍鹭": [
+        "苇丛边三双细腿，没在水里深浅不一。一只盯着左边的水，一只盯着右边，新来的那只守着中间。浅滩被分得很匀。",
+        "三只苍鹭单腿立在浅水处。风大的时候，新来的不再收腿了。三只同时把喙低下水，又同时抬起来。",
+        "苇丛深处窝着两只，浅滩边站着一只。距离还在，但颈子弯的方向开始重合了。水面三道倒影，偶尔叠在一起。",
+    ],
+    "水蛇": [
+        "芦苇根丛分成了三片。两条老水蛇在石缝进出，新来的盘在第三丛根上。水面三道信子的波纹，起伏的节奏慢慢趋近。",
+        "三截鳞光滑过水底，各占一片阴影。石缝、老根、新根，信子伸出来探一探，又缩回去。水下有什么被重新划分过了。",
+        "水底的石缝和两根芦苇根，各缠着一截身子。三颗头从不同方向探出水面，吐信的间隙一样长了。",
+    ],
+    "流浪乌龟": [
+        "石头上趴了三只壳。晒太阳的方向终于一致了，三颗头伸向同一片天光。壳与壳之间的缝隙，刚好放得下几缕风。",
+        "三只龟各找各的晒背处。石头上的两只，岸边泥地上一只。光斑把它们连成一条斜线，谁也没完全缩进壳里。",
+        "老石头上的印子深了两道，岸边多了一道浅的。三只壳在不同的高度接住阳光，闭着眼睛的时间一样长了。",
+    ],
+    "野鸭": [
+        "水面三团涟漪靠得不远不近。两只老住户理着彼此的羽，新来的在旁边把自己埋进翅膀。埋的方向，和那两只是一样的。",
+        "三只野鸭在水面漂着，偶尔调整位置。新来的不再停在几尺外了，浮水的间距刚好够一只翅膀展开。",
+        "池塘安静下来的时候，三只鸭子同时把喙埋进翅膀。风把它们推近了些，又推开。涟漪混在一起，分不清是谁划的。",
+    ],
+    "螃蟹": [
+        "岸边多了一排穴，三个洞口朝向同一片水。潮气重的时候，三对螯同时从洞口探出来。",
+        "沙地上的步足孔开始交叠了。三只螃蟹横着走过同一片沙地，新来的不再绕行。螯偶尔碰在一起，又各自收回。",
+        "三只螃蟹各有各的洞口，但涨水时都退到同一道潮线上。横行的速度慢了，步足孔越来越密，开始分不出是谁踩的。",
+    ],
+}
+
+
+def _settler_arrival_mode(state, name):
+    """返回当前外来定居者会形成配对、近亲解锁三人组，或普通落户。"""
+    count = _settler_count(state, name)
+    if count == 1:
+        return "pair"
+    if count == 2 and _can_invite_settler(state, name):
+        return "trio"
+    return None
+
 
 def _pair_desc(state, key, name, fallback=None):
-    if _settler_count(state, name) == 1:
+    mode = _settler_arrival_mode(state, name)
+    if mode == "pair":
         return _pick_t(state, PAIR_CHOICE_DESC[key])
+    if mode == "trio":
+        return _pick_t(state, TRIO_CHOICE_DESC[key])
     return fallback
 
 
-def _pair_settle_text(state, was_pair, name):
-    return _pick_t(state, PAIR_SETTLE_TEXT[name]) if was_pair else None
+def _settler_settle_text(state, arrival_mode, name):
+    if arrival_mode == "pair":
+        return _pick_t(state, PAIR_SETTLE_TEXT[name])
+    if arrival_mode == "trio":
+        return _pick_t(state, TRIO_SETTLE_TEXT[name])
+    return None
 
 
 def _is_present(state, name):
@@ -3855,6 +3973,7 @@ def _new_settler_dict(name, juvenile=False, state=None, origin="arrived",
     parents = list(dict.fromkeys(parent_ids or []))
     return {
         "name": name, "nickname": None, "age": 0, "health": 1.0,
+        "high_health_days": 0,
         "max_age": t["max_age"], "daily_food": dict(t.get("daily_food", {})),
         "since_hunt": 0,            # 距上次成功捕食的天数（hunter 用）
         "juvenile": juvenile,       # 是否幼体（不自己捕食，靠父母代偿）
@@ -3892,6 +4011,7 @@ def _archive_settler_life(state, s, reason):
         "leave_day": state["turn"],
         "age": leave_age,
         "leave_age": leave_age,
+        "high_health_days": s.get("high_health_days", 0),
         "reason": _settler_reason_code(reason),
         "return_eligible": _settler_reason_code(reason) == "food",
         "return_records": list(s.get("return_records", [])),
@@ -3978,7 +4098,10 @@ def _eligible_return_lives(state, name):
         if leave_day is None or leave_age is None:
             continue
         days_away = max(0, state["turn"] - leave_day)
-        if leave_age + days_away <= max_age:
+        extended_max_age = max_age + min(
+            life.get("high_health_days", 0) // 5, max_age // 5
+        )
+        if leave_age + days_away < extended_max_age:
             out.append((idx, life, days_away))
     out.sort(key=lambda x: (x[2], -(x[1].get("leave_day") or 0)))
     return out
@@ -4014,6 +4137,7 @@ def _returning_settler(state, name, r):
         s["descendant_of"] = life.get("descendant_of")
         leave_age = life.get("leave_age", life.get("age", 0)) or 0
         s["age"] = leave_age + days_away
+        s["high_health_days"] = life.get("high_health_days", 0)
         s["return_from"] = {
             "arrive_day": life.get("arrive_day"),
             "leave_day": life.get("leave_day"),
@@ -4558,6 +4682,8 @@ def _process_settlers(state, events, r):
                     events.append("settler:乌龟缩进壳里，慢慢沉到水底的淤泥中。"
                                   "它不吃也不动，把整个冬天睡了过去。")
                     _chronicle(state, "乌龟潜入水底淤泥，开始冬眠。")
+            if s["health"] >= 0.9:
+                s["high_health_days"] = s.get("high_health_days", 0) + 1
             rec = state["folio"]["settlers"].setdefault(name, {"times": 0, "max_days": 0})
             if s["age"] > rec.get("max_days", 0):
                 rec["max_days"] = s["age"]
@@ -4605,6 +4731,8 @@ def _process_settlers(state, events, r):
             env["detritus"] += cfg["detritus_per_day"]
         if cfg.get("nutrients_per_day"):
             env["nutrients"] += cfg["nutrients_per_day"]
+        if s["health"] >= 0.9:
+            s["high_health_days"] = s.get("high_health_days", 0) + 1
         # 食物不足预警（chronicle 去重）
         _settler_warn_chronicle(state, s)
         # 每日更新万物志最长存活记录（item 6）
@@ -4615,16 +4743,25 @@ def _process_settlers(state, events, r):
         txt = SETTLER_TEXT.get(name, {})
         leave = leave_chron = None
         leave_reason = None
+        longevity_leave = False
+        base_max_age = s.get("max_age", cfg.get("max_age", 0))
+        extended_max_age = base_max_age + min(
+            s.get("high_health_days", 0) // 5, base_max_age // 5
+        )
         if s["health"] <= 0:
             leave = txt.get("starve", "%s 找不到食物，离开了池塘。" % name)
             leave_chron = txt.get("starve_chron", leave)
             leave_reason = "food"
-        elif s["age"] > s["max_age"]:
-            leave = txt.get("age", "年迈的%s悄然离去。" % name)
+        elif s["age"] >= extended_max_age:
+            longevity_leave = s["age"] > base_max_age
+            if longevity_leave:
+                leave = _pick_t(state, LONGEVITY_LEAVE_TEXT[name])
+            else:
+                leave = txt.get("age", "年迈的%s悄然离去。" % name)
             leave_chron = txt.get("age_chron", leave)
             leave_reason = "old_age"
         # 冬季翠鸟：离开改用冬季专属文案（年鉴仍按原因记录）
-        if leave and season == "冬" and name == "翠鸟":
+        if leave and not longevity_leave and season == "冬" and name == "翠鸟":
             leave = _pick(r, KINGFISHER_WINTER_LEAVE)
         # 冬季翠鸟日常描写：15% 概率一条，按 health 分档。纯文案，不影响捕食判定
         elif not leave and season == "冬" and name == "翠鸟" and r.chance(0.15):
@@ -4803,9 +4940,9 @@ def _resolve_choice(state, pc, idx, events):
             msg = "你拍起一片水花，水蛇扭身潜入深处，%s安全了。" % tstr
         elif idx == 3:
             # 第三选项：保持距离观察 → 水蛇定居
-            was_pair = _settler_count(state, "水蛇") == 1
+            arrival_mode = _settler_arrival_mode(state, "水蛇")
             _add_settler(state, "水蛇", events)
-            msg = (_pair_settle_text(state, was_pair, "水蛇") or
+            msg = (_settler_settle_text(state, arrival_mode, "水蛇") or
                    "你决定保持距离。水蛇继续盘在芦苇间，偶尔滑入水中，带起一道细长的波纹。"
                    "它成了池塘里最安静的住客。")
         else:
@@ -4822,11 +4959,11 @@ def _resolve_choice(state, pc, idx, events):
             msg = "长喙一刺，水花溅起，苍鹭衔着银亮的鲫鱼，飞入远处天光里。"
     elif key == "流浪乌龟":
         if idx == 1:
-            was_pair = _settler_count(state, "流浪乌龟") == 1
+            arrival_mode = _settler_arrival_mode(state, "流浪乌龟")
             _add_settler(state, "流浪乌龟", events)
             state["flags"]["turtle_resident"] = True
             _unlock(state, events, "不速之客")
-            msg = (_pair_settle_text(state, was_pair, "流浪乌龟") or
+            msg = (_settler_settle_text(state, arrival_mode, "流浪乌龟") or
                    "你收留了它。乌龟踏入浅水，壳没入光影交界的绿里。")
         else:
             msg = "乌龟在岸边停了一会儿，然后转身，消失在草丛深处。"
@@ -4915,33 +5052,33 @@ def _resolve_choice(state, pc, idx, events):
             msg = "你没有动手。几天后，浮萍和睡莲的叶开始挤压绿藻的空间，水面慢慢被撕开几道缝隙。"
     elif key == "螃蟹":
         if idx == 1:
-            was_pair = _settler_count(state, "螃蟹") == 1
+            arrival_mode = _settler_arrival_mode(state, "螃蟹")
             _add_settler(state, "螃蟹", events)
-            msg = (_pair_settle_text(state, was_pair, "螃蟹") or
+            msg = (_settler_settle_text(state, arrival_mode, "螃蟹") or
                    "你收留了这只螃蟹。它横着爬进池塘，钳子夹住一块石头，在底下安了家。")
         else:
             msg = "螃蟹在岸边转了两圈，又横着爬回了浑水里，不见了。"
     elif key == "野鸭":
         if idx == 1:
-            was_pair = _settler_count(state, "野鸭") == 1
+            arrival_mode = _settler_arrival_mode(state, "野鸭")
             _add_settler(state, "野鸭", events)
-            msg = (_pair_settle_text(state, was_pair, "野鸭") or
+            msg = (_settler_settle_text(state, arrival_mode, "野鸭") or
                    "你欢迎了这只野鸭。它在芦苇丛边停下，开始把水面当成自己的领地。")
         else:
             msg = "你没有挽留。野鸭在池塘歇了一夜，天刚亮就起飞了，翅膀扇动的声音很久才散。"
     elif key == "翠鸟定居":
         if idx == 1:
-            was_pair = _settler_count(state, "翠鸟") == 1
+            arrival_mode = _settler_arrival_mode(state, "翠鸟")
             _add_settler(state, "翠鸟", events)
-            msg = (_pair_settle_text(state, was_pair, "翠鸟") or
+            msg = (_settler_settle_text(state, arrival_mode, "翠鸟") or
                    "你默许了。翠鸟衔来第一根细枝，搭在枯枝的弯处。从此池塘多了一道蓝影，不只是过客。")
         else:
             msg = "你没有出声。翠鸟在枝头停了一会儿，最终飞走了，落在远处另一片水域。"
     elif key == "苍鹭定居":
         if idx == 1:
-            was_pair = _settler_count(state, "苍鹭") == 1
+            arrival_mode = _settler_arrival_mode(state, "苍鹭")
             _add_settler(state, "苍鹭", events)  # 内部会设置 heron_resident 永久标记
-            msg = (_pair_settle_text(state, was_pair, "苍鹭") or
+            msg = (_settler_settle_text(state, arrival_mode, "苍鹭") or
                    "你欢迎了它。苍鹭继续衔枝，在岸边搭起一个粗糙的巢。它成了池塘最从容的住客。")
         else:
             msg = "你扬起手，苍鹭展开宽大的翅膀退后两步，看了你一眼，最终放弃了枯枝，飞远了。"
@@ -4961,11 +5098,11 @@ def _resolve_choice(state, pc, idx, events):
             msg = "你没有动手。那只龟继续伏在石头上，等水面安静下来。"
     elif key == "福寿螺入侵":
         if idx == 1:
-            was_pair = _settler_count(state, "螃蟹") == 1
+            arrival_mode = _settler_arrival_mode(state, "螃蟹")
             if _can_invite_settler(state, "螃蟹"):
                 _add_settler(state, "螃蟹", events)
             state["flags"]["apple_snail"] = {"status": "clearing", "leave_day": state["turn"] + 3}
-            msg = (_pair_settle_text(state, was_pair, "螃蟹") or
+            msg = (_settler_settle_text(state, arrival_mode, "螃蟹") or
                    _pick_t(state, DISASTER_TEXT["福寿螺入侵"]["crab"]))
         else:
             state["flags"]["apple_snail"] = "gone"
