@@ -1657,6 +1657,14 @@ ACHIEVEMENTS = {
     "宾至如归": "六种故人都来过。",
     "旧巢新燕": "新来的那位，动作很像。",
     "🍊特供 · 蛇我而去": "纪念静静与面条，感谢你发现了水蛇冬眠的Bug。",
+    # ---- 池塘评分成就 ----
+    "小荷才露": "池塘初见起色。",
+    "鱼跃鸢飞": "满池生机。",
+    "明镜止水": "水清明如镜。",
+    "水清鱼读月": "水清鱼读月，山静鸟谈天。",
+    "一潭死水": "这潭水，死了。",
+    "眼看他楼塌了": "眼看他起朱楼，眼看他宴宾客。",
+    "破罐破摔": "塘臭了，你还每天来看。",
 }
 
 # 定居者物种 -> 专属"离开累计3次"成就名
@@ -1714,6 +1722,9 @@ def fresh_state(seed):
             "garden_streak": 0,          # 睡莲与水藻同时存在的连续天数
             "experienced_drought": False,  # 是否经历过干旱
             "duck_visits": 0,            # 迁徙野鸭群累计来访次数
+            "score_ge85_streak": 0,      # 池塘评分 >=85 连续天数
+            "score_lt15_streak": 0,      # 第30天后评分 <15 连续天数
+            "score_peak": 0,             # 历史最高池塘评分
             # 四季生态机制状态
             "ice_on": False,             # 冬季是否结冰（持续到春季）
             "had_lily": False,           # 是否曾有过睡莲（来年春季可恢复）
@@ -3206,7 +3217,9 @@ def tick(state):
     _detect_pause(state, events)
 
     # --- 成就检测 ---
-    _check_achievements(state, events)
+    pond_score = _pond_score(state)[0]
+    _update_score_tracking(state, pond_score)
+    _check_achievements(state, events, pond_score)
 
     # --- 年终生态简报：每满一年（120 天）输出一段（item 28） ---
     if turn % YEAR_LEN == 0:
@@ -4994,10 +5007,26 @@ def _detect_pause(state, events):
         state["pending_pause"] = "；".join(dict.fromkeys(reasons))
 
 
-def _check_achievements(state, events):
+def _update_score_tracking(state, score):
+    """更新池塘评分成就所需的峰值与连续天数。"""
+    f = state["flags"]
+    f["score_peak"] = max(f.get("score_peak", 0), score)
+    if score >= 85:
+        f["score_ge85_streak"] = f.get("score_ge85_streak", 0) + 1
+    else:
+        f["score_ge85_streak"] = 0
+    if state.get("turn", 0) > 30 and score < 15:
+        f["score_lt15_streak"] = f.get("score_lt15_streak", 0) + 1
+    else:
+        f["score_lt15_streak"] = 0
+
+
+def _check_achievements(state, events, pond_score=None):
     pop = state["populations"]
     f = state["flags"]
     present = [n for n in RESIDENT_SPECIES if pop[n] >= 1]
+    if pond_score is None:
+        pond_score = _pond_score(state)[0]
 
     if len([n for n in RESIDENT_SPECIES if pop[n] >= 1]) >= 1 and state["seen"]:
         _unlock(state, events, "初生之池")
@@ -5028,6 +5057,21 @@ def _check_achievements(state, events):
         _unlock(state, events, "底栖王国")
     if len(present) >= 15:
         _unlock(state, events, "共生之池")
+    # ---- 池塘评分成就 ----
+    if pond_score >= 60:
+        _unlock(state, events, "小荷才露")
+    if pond_score >= 75:
+        _unlock(state, events, "鱼跃鸢飞")
+    if pond_score >= 90:
+        _unlock(state, events, "明镜止水")
+    if f.get("score_ge85_streak", 0) >= 30:
+        _unlock(state, events, "水清鱼读月")
+    if state["turn"] > 30 and pond_score < 10:
+        _unlock(state, events, "一潭死水")
+    if f.get("score_peak", 0) >= 70 and pond_score < 20:
+        _unlock(state, events, "眼看他楼塌了")
+    if f.get("score_lt15_streak", 0) >= 15:
+        _unlock(state, events, "破罐破摔")
     # 仙鹤降临、水华危机在对应事件中直接解锁
 
 
@@ -6994,6 +7038,9 @@ def _lite_snapshot(state):
         "pending_choice": state.get("pending_choice"),
         "pending_wait_days": state.get("pending_wait_days", 0),
         "choice_cooldowns": state.get("choice_cooldowns", {}),
+        "score_ge85_streak": state.get("flags", {}).get("score_ge85_streak", 0),
+        "score_lt15_streak": state.get("flags", {}).get("score_lt15_streak", 0),
+        "score_peak": state.get("flags", {}).get("score_peak", 0),
         # 关键事件年鉴：保留解锁/归零/定居者来去/灾害/决策/季节，砍掉日常记录（item G1）
         "chronicle": state.get("key_chronicle", [])[-120:],
         # folio 摘要：每本志压缩为最小键值，不含逐条 notes
@@ -7045,6 +7092,9 @@ def _restore_from_lite(data):
     base["pending_choice"] = data.get("pending_choice")
     base["pending_wait_days"] = data.get("pending_wait_days", 0)
     base["choice_cooldowns"] = data.get("choice_cooldowns", {})
+    base["flags"]["score_ge85_streak"] = data.get("score_ge85_streak", 0)
+    base["flags"]["score_lt15_streak"] = data.get("score_lt15_streak", 0)
+    base["flags"]["score_peak"] = data.get("score_peak", 0)
     fs = data.get("folio", {})
     base["folio"]["species"] = {
         n: {"first_day": p[0], "first_season": None,
