@@ -26,6 +26,29 @@ SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eco_save.j
 SUNLIGHT_WEATHERS = frozenset(("晴", "多云", "大风", "春寒", "秋霜"))
 DAYLIGHT_WEATHERS = frozenset(("晴", "多云", "阴", "大风", "春寒", "秋霜"))
 
+
+def _named_versions(pool, edits):
+    """由原文池构造昵称版；None 表示该条不适合绑定具体个体。
+
+    edits 中的非空项为 (old, new)，只替换正文中的第一处。元组文案的物种、
+    天气依赖原样保留。原池本身绝不修改，因而无昵称路线仍逐字使用旧文案。
+    """
+    assert len(pool) == len(edits)
+    named = []
+    for item, edit in zip(pool, edits):
+        if edit is None:
+            continue
+        text = item[0] if isinstance(item, tuple) else item
+        old, new = edit
+        assert old in text
+        rewritten = text.replace(old, new, 1)
+        assert "{nickname}" in rewritten
+        if isinstance(item, tuple):
+            named.append((rewritten,) + item[1:])
+        else:
+            named.append(rewritten)
+    return named
+
 # ---------------------------------------------------------------------------
 # 1. PRNG —— mulberry32（确定性，可序列化）
 # ---------------------------------------------------------------------------
@@ -309,6 +332,13 @@ SETTLER_HINTS = {
     "野鸭": "水面上的植物缺了几块，边缘参差，不像风吹的。有些叶子翻了过来，背面朝天。",
     "螃蟹": "水底的泥沙总像是刚被翻过，这里一个小坑，那里一堆松土。石缝外面的碎泥比平时多。",
 }
+SETTLER_HINTS_NAMED = {
+    "翠鸟": "枯枝下的水面，银亮的光闪得没以前密了。{nickname}蹲在枝头，喙里空的时候多了些。",
+    "苍鹭": "浅水里那些窜来窜去的影子变稀了。{nickname}站在水边，比刚来时走得更远才停下。",
+    "水蛇": "芦苇丛边的蛙鸣少了。偶尔叫一声，也很快收住，像被{nickname}压了回去。",
+    "流浪乌龟": "水底的石头有几块不在原来的位置了。淤泥上多了几道拖过的痕迹，像是被{nickname}慢慢犁过。",
+    # 野鸭句是纯环境痕迹；螃蟹句也没有可自然落名的个体动作，保留无名。
+}
 
 # 定居者猎物全部归零时的一次性预警（补一·2）。猎物恢复后清除标记可再次触发。
 SETTLER_PREY_GONE = {
@@ -318,6 +348,14 @@ SETTLER_PREY_GONE = {
     "流浪乌龟": "乌龟爬遍了每一块石头，啃了又啃，石面上再没有啃出干净的灰白。它浮上来换气，停了很久才沉下去。",
     "野鸭": "野鸭把头埋进水里，很快又抬起来。再埋下去，再抬起来。它们在岸边来来回回地走，喙里总是空的。",
     "螃蟹": "螃蟹翻遍水底的石头，翻一块，停一下，再翻下一块。钳子举着，却没有东西可以夹。它缩回石缝里，很久没出来。",
+}
+SETTLER_PREY_GONE_NAMED = {
+    "翠鸟": "{nickname}在枝头偏了又偏头，俯冲了一次，空的。再俯冲，还是空的。它在枯枝上收紧了爪子，喙微微张着，很久没有叫。",
+    "苍鹭": "{nickname}在浅水里换了一个位置，又换了一个。长喙始终没有刺下去。它站在水边，翅膀轻轻抖了一下，像是在忍什么。",
+    "水蛇": "{nickname}盘在芦苇根部，头昂着，信子不停地吐。它滑进水里巡了一圈，又空着回来，身体重新盘紧，比平时更紧。",
+    "流浪乌龟": "{nickname}爬遍了每一块石头，啃了又啃，石面上再没有啃出干净的灰白。它浮上来换气，停了很久才沉下去。",
+    # 野鸭原文明确是群体。
+    "螃蟹": "{nickname}翻遍水底的石头，翻一块，停一下，再翻下一块。钳子举着，却没有东西可以夹。它缩回石缝里，很久没出来。",
 }
 
 # 季节过渡预兆：每季第 29-30 天（换季前两天）在 observe 末尾追加一句（补一·5）。
@@ -397,6 +435,43 @@ SETTLER_TEXT = {
     },
 }
 
+# SETTLER_TEXT 的到来文案描述未命名新客，只有离别正文/年鉴可绑定当前 s。
+SETTLER_LEAVE_NAMED = {
+    "流浪乌龟": {
+        "starve": "{nickname}找不到食物，缩进壳里，慢慢爬离了池塘。",
+        "age": "年迈的{nickname}在一个清晨悄然离去，水面恢复了平静。",
+    },
+    "螃蟹": {
+        "starve": "{nickname}翻遍水底也找不到足够的食物，拖着空空的壳，爬出了池塘。",
+        "age": "年老的{nickname}在一个秋日里慢慢爬到岸边，缩进石缝，再也没有出来。",
+        "starve_chron": "{nickname}找不到食物，拖着空壳爬出了池塘。",
+        "age_chron": "年老的{nickname}在一个秋日里缩进石缝，再也没有出来。",
+    },
+    "水蛇": {
+        "starve": "{nickname}守了多日，再找不到足够的猎物，终于滑入芦苇深处，再也没有盘回来。",
+        "age": "{nickname}在一个清晨缓缓滑向岸边，钻进草丛，池塘失去了它最安静的住客。",
+        "starve_chron": "{nickname}找不到猎物，滑入了芦苇深处。",
+        "age_chron": "{nickname}在某个清晨离去，池塘的水面再也不见那道细长的波纹。",
+    },
+    "野鸭": {
+        # 饥饿离开写的是一对；年迈离开明确是当前这只个体。
+        "age": "年老的{nickname}在一个秋日悄然离群，独自飞向南方，再也没有回来。",
+        "age_chron": "年老的{nickname}在秋日离群南飞，再也没有回来。",
+    },
+    "翠鸟": {
+        "starve": "{nickname}在枝头等了许久。水里再也没有合适的鱼影浮上，它终于飞走了，枯枝上空出一截。",
+        "age": "{nickname}的羽毛不如从前蓝了。一个清晨，它最后一次从枯枝上俯冲入水，然后飞向远方，没有再回来。",
+        "starve_chron": "{nickname}飞走了，枯枝上空了一截。",
+        "age_chron": "年老的{nickname}最后一次俯冲入水，飞向了远方。",
+    },
+    "苍鹭": {
+        "starve": "浅水里的鱼越来越少了。{nickname}在岸边站了一整天，终于展开宽大的翅膀，朝远方飞去。",
+        "age": "年老的{nickname}动作越来越慢。某个冬日它蜷缩在巢边，天亮时已经不动了。水面上再没有那个从容的倒影。",
+        "starve_chron": "{nickname}离开了，浅水里再也看不到那个安静的倒影。",
+        "age_chron": "年老的{nickname}在冬日的巢边静卧而去。",
+    },
+}
+
 LONGEVITY_LEAVE_TEXT = {
     "翠鸟": [
         "那道蓝影最后一次扎进水里，力道比年轻时轻了很多。但枯枝上它待过的痕迹，比任何一只都深。它多看了好几个春天。",
@@ -428,6 +503,30 @@ LONGEVITY_LEAVE_TEXT = {
         "老螃蟹退回洞穴，再也没有横着出来。它的螯接过的晨光，比任何一只都多。潮线上那排孔，有一行特别深。",
         "沙地上多了一个不再打开的洞口。那只螃蟹比其他同类多蜕了好几轮壳，旧壳还散在岸边各处。池塘的泥沙记得它。",
     ],
+}
+LONGEVITY_LEAVE_TEXT_NAMED = {
+    "翠鸟": _named_versions(LONGEVITY_LEAVE_TEXT["翠鸟"], [
+        ("那道蓝影", "{nickname}"), ("翠鸟", "{nickname}"), ("它在风里", "{nickname}在风里"),
+    ]),
+    "苍鹭": _named_versions(LONGEVITY_LEAVE_TEXT["苍鹭"], [
+        ("它走的时候", "{nickname}走的时候"), ("苇丛里的苍鹭", "苇丛里的{nickname}"),
+        ("老苍鹭", "年老的{nickname}"),
+    ]),
+    "水蛇": _named_versions(LONGEVITY_LEAVE_TEXT["水蛇"], [
+        ("石缝里的鳞光", "{nickname}的鳞光"), ("那条水蛇", "{nickname}"),
+        ("老水蛇", "年老的{nickname}"),
+    ]),
+    "流浪乌龟": _named_versions(LONGEVITY_LEAVE_TEXT["流浪乌龟"], [
+        ("石头上那只壳", "石头上{nickname}的壳"), ("老龟", "年老的{nickname}"),
+        ("年迈的流浪乌龟", "年迈的{nickname}"),
+    ]),
+    "野鸭": _named_versions(LONGEVITY_LEAVE_TEXT["野鸭"], [
+        ("老野鸭", "{nickname}"), ("野鸭", "{nickname}"), ("老野鸭", "年老的{nickname}"),
+    ]),
+    "螃蟹": _named_versions(LONGEVITY_LEAVE_TEXT["螃蟹"], [
+        ("岸边洞口那只螯", "岸边洞口{nickname}的螯"), ("老螃蟹", "年老的{nickname}"),
+        ("那只螃蟹", "{nickname}"),
+    ]),
 }
 
 SETTLER_RETURN_TEXT = {
@@ -572,6 +671,26 @@ KINGFISHER_WINTER_LEAVE = [
     "冰面重新封紧。枯枝上积了一层薄雪。什么也没来过一样。",
     "池塘在等。等冰裂，等光回来。但那个蓝影不会回来了。",
 ]
+KINGFISHER_WINTER_DAILY_NAMED = _named_versions(KINGFISHER_WINTER_DAILY, [
+    ("翠鸟", "{nickname}"), ("扎进水里", "{nickname}扎进水里"),
+    ("它甩掉", "{nickname}甩掉"), ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"),
+])
+KINGFISHER_WINTER_HUNGRY_NAMED = _named_versions(KINGFISHER_WINTER_HUNGRY, [
+    ("已经是", "{nickname}已经是"), ("翠鸟", "{nickname}"),
+    ("蓝羽不再亮了", "{nickname}的蓝羽不再亮了"), ("它在枝上", "{nickname}在枝上"),
+    ("最后一次扎水", "{nickname}最后一次扎水"),
+])
+KINGFISHER_WINTER_CRITICAL_NAMED = _named_versions(KINGFISHER_WINTER_CRITICAL, [
+    ("翠鸟", "{nickname}"), ("它试着", "{nickname}试着"), ("翠鸟", "{nickname}"),
+    ("它把喙", "{nickname}把喙"), ("翠鸟", "{nickname}"),
+])
+KINGFISHER_WINTER_LEAVE_NAMED = [
+    "枯枝空了。冰面上有几粒碎冰，是{nickname}的爪尖蹬掉的。",
+    "风把雪屑吹进那道冰缝里。水下的鱼影子晃了一下，又沉下去了。{nickname}已经不在枝头。",
+    "{nickname}飞过池塘上空，蓝羽在灰白的天光里闪了最后一下。没回头。",
+    "冰面重新封紧。枯枝上积了一层薄雪。像{nickname}从未来过一样。",
+    "池塘在等。等冰裂，等光回来。但{nickname}不会回来了。",
+]
 
 # 苍鹭定居者捕食成功 / 失败文案
 HERON_HIT = [
@@ -601,6 +720,39 @@ HERON_MISS_GRASS_CARP = [
     "浑水里什么也看不清。苍鹭刺了两次，两次都是空的。草鱼在浑雾里换了方向，等水清了，它已经在对岸的浮萍底下。",
     "苍鹭在浅水边等了很久，终于等到一条草鱼游近。它刺下去——太早了。喙尖入水时草鱼还没到位，等喙到的时候鱼已经退了。",
 ]
+
+KINGFISHER_HIT_NAMED = _named_versions(KINGFISHER_HIT, [
+    ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"),
+    ("它盘旋", "{nickname}盘旋"), ("翠鸟", "{nickname}"),
+])
+KINGFISHER_HIT_PANGPI_NAMED = _named_versions(KINGFISHER_HIT_PANGPI, [
+    ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"),
+    ("枯枝上的翠鸟", "枯枝上的{nickname}"), ("翠鸟", "{nickname}"),
+])
+KINGFISHER_MISS_NAMED = _named_versions(KINGFISHER_MISS, [
+    ("翠鸟", "{nickname}"), ("它扑", "{nickname}扑"), ("翠鸟", "{nickname}"),
+    ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"),
+])
+KINGFISHER_MISS_PANGPI_NAMED = _named_versions(KINGFISHER_MISS_PANGPI, [
+    ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"),
+    ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"),
+])
+HERON_HIT_NAMED = _named_versions(HERON_HIT, [
+    ("苍鹭", "{nickname}"), ("它慢慢", "{nickname}慢慢"), ("苍鹭", "{nickname}"),
+    ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"),
+])
+HERON_HIT_GRASS_CARP_NAMED = _named_versions(HERON_HIT_GRASS_CARP, [
+    ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"),
+    ("苍鹭", "{nickname}"),
+])
+HERON_MISS_NAMED = _named_versions(HERON_MISS, [
+    ("苍鹭", "{nickname}"), ("它出击", "{nickname}出击"), ("苍鹭", "{nickname}"),
+    ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"),
+])
+HERON_MISS_GRASS_CARP_NAMED = _named_versions(HERON_MISS_GRASS_CARP, [
+    ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"),
+    ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"),
+])
 
 # 定居者繁殖事件文案（每种 3 套）
 SETTLER_BREED = {
@@ -681,15 +833,84 @@ SETTLER_GROWN = {
         "水蛇悄无声息地游过水面，头探向岸边，又慢慢收回去。没有人再能分出它是哪一年破壳的了。",
     ],
 }
+SETTLER_GROWN_NAMED = {
+    "翠鸟": _named_versions(SETTLER_GROWN["翠鸟"], [
+        ("小翠鸟", "{nickname}"), ("它第一次", "{nickname}第一次"),
+        ("小翠鸟", "{nickname}"), ("它不再", "{nickname}不再"),
+        ("那只幼鸟", "{nickname}"),
+    ]),
+    "苍鹭": _named_versions(SETTLER_GROWN["苍鹭"], [
+        ("小苍鹭", "{nickname}"), ("幼鸟", "{nickname}"),
+        ("小苍鹭", "{nickname}"), ("它不再", "{nickname}不再"),
+        ("那只苍鹭", "{nickname}"),
+    ]),
+    "野鸭": _named_versions(SETTLER_GROWN["野鸭"], [
+        ("小鸭", "{nickname}"), ("幼鸭", "{nickname}"),
+        ("小鸭", "{nickname}"), ("它开始", "{nickname}开始"), None,
+    ]),
+    "流浪乌龟": _named_versions(SETTLER_GROWN["流浪乌龟"], [
+        ("小龟", "{nickname}"), ("小龟", "{nickname}"),
+        ("它在水底", "{nickname}在水底"), ("那只小龟", "{nickname}"),
+        ("乌龟", "{nickname}"),
+    ]),
+    "螃蟹": _named_versions(SETTLER_GROWN["螃蟹"], [
+        ("小蟹", "{nickname}"), ("幼蟹", "{nickname}"),
+        ("小蟹", "{nickname}"), ("它不再", "{nickname}不再"),
+        ("螃蟹", "{nickname}"),
+    ]),
+    "水蛇": _named_versions(SETTLER_GROWN["水蛇"], [
+        ("幼蛇", "{nickname}"), ("小蛇", "{nickname}"),
+        ("它第一次", "{nickname}第一次"), ("幼蛇", "{nickname}"),
+        ("水蛇", "{nickname}"),
+    ]),
+}
 
 TURTLE_WAKE_TEXT = [
     ("乌龟从淤泥里探出头来，壳上还沾着泥。它慢吞吞爬向有阳光的浅水，冬眠结束了。",
      (), SUNLIGHT_WEATHERS),
     "乌龟从淤泥里探出头来，壳上还沾着泥。它慢吞吞爬回浅水，冬眠结束了。",
 ]
+TURTLE_WAKE_TEXT_NAMED = _named_versions(TURTLE_WAKE_TEXT, [
+    ("乌龟", "{nickname}"), ("乌龟", "{nickname}"),
+])
+
+SETTLER_HIBERNATE_TEXT = {
+    "水蛇": ["水蛇缓缓盘紧身体，钻进芦苇根部的枯叶堆里，一动不动。"],
+    "流浪乌龟": ["乌龟缩进壳里，慢慢沉到水底的淤泥中。它不吃也不动，把整个冬天睡了过去。"],
+}
+SETTLER_HIBERNATE_TEXT_NAMED = {
+    "水蛇": ["{nickname}缓缓盘紧身体，钻进芦苇根部的枯叶堆里，一动不动。"],
+    "流浪乌龟": ["{nickname}缩进壳里，慢慢沉到水底的淤泥中。它不吃也不动，把整个冬天睡了过去。"],
+}
+SETTLER_WAKE_TEXT = {
+    "水蛇": ["芦苇丛深处有什么在动。水蛇从枯叶堆里探出头，吐了吐信子，慢慢滑向水面。"],
+    "流浪乌龟": TURTLE_WAKE_TEXT,
+}
+SETTLER_WAKE_TEXT_NAMED = {
+    "水蛇": ["芦苇丛深处有什么在动。{nickname}从枯叶堆里探出头，吐了吐信子，慢慢滑向水面。"],
+    "流浪乌龟": TURTLE_WAKE_TEXT_NAMED,
+}
+
+SETTLER_HIBERNATE_CHRON = {
+    "水蛇": "水蛇钻进芦苇根部，开始冬眠。",
+    "流浪乌龟": "乌龟潜入水底淤泥，开始冬眠。",
+}
+SETTLER_HIBERNATE_CHRON_NAMED = {
+    "水蛇": "{nickname}钻进芦苇根部，开始冬眠。",
+    "流浪乌龟": "{nickname}潜入水底淤泥，开始冬眠。",
+}
+SETTLER_WAKE_CHRON = {
+    "水蛇": "水蛇结束冬眠，重新出没在池塘。",
+    "流浪乌龟": "乌龟结束冬眠，重新回到池塘。",
+}
+SETTLER_WAKE_CHRON_NAMED = {
+    "水蛇": "{nickname}结束冬眠，重新出没在池塘。",
+    "流浪乌龟": "{nickname}结束冬眠，重新回到池塘。",
+}
 
 SETTLER_BREED_CHRON = "%s 在池塘繁衍了下一代——池塘有了二代住客。"
 SETTLER_GROWN_CHRON = "那只幼年的%s长成了，开始独自在池塘讨生活。"
+SETTLER_GROWN_CHRON_NAMED = "幼年的{nickname}长成了，开始独自在池塘讨生活。"
 SETTLER_RESIDENT_LIMIT = 8
 
 # 定居者食物不足预警（每种 轻/重 各 3 套）
@@ -757,8 +978,50 @@ SETTLER_WARN_HEAVY = {
         "水蛇缓缓滑进芦苇深处，身体在枯茎间一闪一闪，越来越远，终于看不到了。",
     ],
 }
+SETTLER_WARN_LIGHT_NAMED = {
+    "翠鸟": _named_versions(SETTLER_WARN_LIGHT["翠鸟"], [
+        ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"), ("它从", "{nickname}从"),
+    ]),
+    "苍鹭": _named_versions(SETTLER_WARN_LIGHT["苍鹭"], [
+        ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"), ("它站", "{nickname}站"),
+    ]),
+    "野鸭": _named_versions(SETTLER_WARN_LIGHT["野鸭"], [
+        ("野鸭", "{nickname}"), None, None,
+    ]),
+    "流浪乌龟": _named_versions(SETTLER_WARN_LIGHT["流浪乌龟"], [
+        ("乌龟", "{nickname}"), ("乌龟", "{nickname}"), ("它浮", "{nickname}浮"),
+    ]),
+    "螃蟹": _named_versions(SETTLER_WARN_LIGHT["螃蟹"], [
+        ("螃蟹", "{nickname}"), ("螃蟹", "{nickname}"), ("它挖", "{nickname}挖"),
+    ]),
+    "水蛇": _named_versions(SETTLER_WARN_LIGHT["水蛇"], [
+        ("水蛇", "{nickname}"), ("水蛇", "{nickname}"), ("水蛇", "{nickname}"),
+    ]),
+}
+SETTLER_WARN_HEAVY_NAMED = {
+    "翠鸟": _named_versions(SETTLER_WARN_HEAVY["翠鸟"], [
+        ("翠鸟", "{nickname}"), ("它很久", "{nickname}很久"), ("翠鸟", "{nickname}"),
+    ]),
+    "苍鹭": _named_versions(SETTLER_WARN_HEAVY["苍鹭"], [
+        ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"),
+    ]),
+    "野鸭": _named_versions(SETTLER_WARN_HEAVY["野鸭"], [
+        None, None, ("野鸭", "{nickname}"),
+    ]),
+    "流浪乌龟": _named_versions(SETTLER_WARN_HEAVY["流浪乌龟"], [
+        ("乌龟", "{nickname}"), ("它在", "{nickname}在"), ("乌龟", "{nickname}"),
+    ]),
+    "螃蟹": _named_versions(SETTLER_WARN_HEAVY["螃蟹"], [
+        ("螃蟹", "{nickname}"), ("它不再", "{nickname}不再"), ("螃蟹", "{nickname}"),
+    ]),
+    "水蛇": _named_versions(SETTLER_WARN_HEAVY["水蛇"], [
+        ("水蛇", "{nickname}"), ("它不再", "{nickname}不再"), ("水蛇", "{nickname}"),
+    ]),
+}
 SETTLER_WARN_CHRON_LIGHT = "%s 开始吃不饱了。"
 SETTLER_WARN_CHRON_HEAVY = "%s 濒临饿死，命悬一线。"
+SETTLER_WARN_CHRON_LIGHT_NAMED = "{nickname}开始吃不饱了。"
+SETTLER_WARN_CHRON_HEAVY_NAMED = "{nickname}濒临饿死，命悬一线。"
 
 # ---------------------------------------------------------------------------
 # 2c. 决策事件（choose 机制）
@@ -1313,6 +1576,29 @@ GAZE_SETTLER = {
         "苍鹭在岸边慢慢走动，长腿抬起、落下，每一步都像经过计算。水里的倒影跟着它无声地移动。",
     ],
 }
+GAZE_SETTLER_NAMED = {
+    "流浪乌龟": _named_versions(GAZE_SETTLER["流浪乌龟"], [
+        ("乌龟", "{nickname}"), ("它慢", "{nickname}慢"), ("乌龟", "{nickname}"),
+        ("乌龟", "{nickname}"), ("乌龟", "{nickname}"),
+    ]),
+    "螃蟹": _named_versions(GAZE_SETTLER["螃蟹"], [
+        ("螃蟹", "{nickname}"), ("螃蟹", "{nickname}"), ("螃蟹", "{nickname}"),
+        ("它在", "{nickname}在"), ("螃蟹", "{nickname}"),
+    ]),
+    "水蛇": _named_versions(GAZE_SETTLER["水蛇"], [
+        ("水蛇", "{nickname}"), ("水蛇", "{nickname}"), ("水蛇", "{nickname}"),
+        ("水蛇", "{nickname}"), ("水蛇", "{nickname}"),
+    ]),
+    "野鸭": _named_versions(GAZE_SETTLER["野鸭"], [
+        None, ("野鸭", "{nickname}"), None, ("野鸭", "{nickname}"), None,
+    ]),
+    "翠鸟": _named_versions(GAZE_SETTLER["翠鸟"], [
+        ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"), ("翠鸟", "{nickname}"),
+    ]),
+    "苍鹭": _named_versions(GAZE_SETTLER["苍鹭"], [
+        ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"),
+    ]),
+}
 
 GAZE_EMPTY = [
     ("池塘空着。天光落在水面，没有动静。", (), DAYLIGHT_WEATHERS),
@@ -1395,6 +1681,14 @@ OBSERVE_AMBIENT = {
         "风轻轻推了一下水面，涟漪从东岸荡到西岸，碰到岸边又荡回来。鱼在水草间打了个转，又游回原来的位置。",
         ("天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地转着。今天没有大事发生，这就很好。", (), DAYLIGHT_WEATHERS),
     ],
+}
+OBSERVE_SETTLER_NAMED = {
+    "流浪乌龟": _named_versions([OBSERVE_AMBIENT["settler"][0]], [("乌龟", "{nickname}")]),
+    "翠鸟": _named_versions([OBSERVE_AMBIENT["settler"][1]], [("翠鸟", "{nickname}")]),
+    "苍鹭": _named_versions([OBSERVE_AMBIENT["settler"][2]], [("苍鹭", "{nickname}")]),
+    "水蛇": _named_versions([OBSERVE_AMBIENT["settler"][3]], [("水蛇", "{nickname}")]),
+    # 野鸭原文明确是并排游动的多只个体。
+    "螃蟹": _named_versions([OBSERVE_AMBIENT["settler"][5]], [("螃蟹", "{nickname}")]),
 }
 
 # 灾害进行中的 observe 专属描写（按持续天气类型选择）
@@ -1510,6 +1804,14 @@ VISITOR_MISS = {
         "流浪猫蹲在岸边，爪子在水中捞了又捞。什么也没有。它甩甩爪子，悻悻地走了。",
         "猫盯了很久的水面，尾巴轻轻甩着。水里没有鱼影闪过。它站起来，钻进草丛不见了。",
     ],
+}
+SETTLER_ABSENT_NAMED = {
+    "翠鸟": _named_versions(VISITOR_MISS["翠鸟"], [
+        ("翠鸟", "{nickname}"), ("它在", "{nickname}在"),
+    ]),
+    "苍鹭": _named_versions(VISITOR_MISS["苍鹭"], [
+        ("苍鹭", "{nickname}"), ("苍鹭", "{nickname}"),
+    ]),
 }
 
 # ---------------------------------------------------------------------------
@@ -4240,6 +4542,10 @@ SETTLER_HUNT_TEXT = {
     "翠鸟": (KINGFISHER_HIT, KINGFISHER_MISS, VISITOR_MISS["翠鸟"]),
     "苍鹭": (HERON_HIT, HERON_MISS, VISITOR_MISS["苍鹭"]),
 }
+SETTLER_HUNT_TEXT_NAMED = {
+    "翠鸟": (KINGFISHER_HIT_NAMED, KINGFISHER_MISS_NAMED, SETTLER_ABSENT_NAMED["翠鸟"]),
+    "苍鹭": (HERON_HIT_NAMED, HERON_MISS_NAMED, SETTLER_ABSENT_NAMED["苍鹭"]),
+}
 
 
 # 定居者照面文案：key 为 frozenset({甲, 乙})，两两成对，与出场顺序无关。
@@ -4458,6 +4764,52 @@ def _pick_weather(state, r, arr):
     return avail[r.randint(0, len(avail) - 1)]
 
 
+def _pick_settler_text(state, r, settler, unnamed, named=None, mode="random",
+                       recent=None, allow=None):
+    """统一选择并渲染具体定居者文案，昵称有无不改变随机调用次数。
+
+    mode='random' 与天气过滤池一致消耗一次 PRNG；'recent' 也只消耗一次并
+    把所选池内索引写入 recent；'turn' 按回合取模、'first' 取首条，二者
+    都不消耗 PRNG。named 为空时安全回退原池。allow 只做确定性过滤。
+    """
+    nickname = settler.get("nickname") if settler else None
+    pool = named if nickname and named else unnamed
+
+    def candidates(source):
+        out = []
+        for idx, item in enumerate(source):
+            text, _deps, weathers = _text_parts(item)
+            if weathers is not None and _weather(state) not in weathers:
+                continue
+            if allow is not None and not allow(text):
+                continue
+            out.append((idx, text))
+        return out
+
+    avail = candidates(pool)
+    using_named = pool is named and bool(nickname)
+    if not avail and using_named:
+        pool = unnamed
+        avail = candidates(pool)
+        using_named = False
+    if not avail:
+        return None
+
+    if mode == "turn":
+        _idx, text = avail[state["turn"] % len(avail)]
+    elif mode == "first":
+        _idx, text = avail[0]
+    elif mode == "recent":
+        choices = [entry for entry in avail if entry[0] not in recent] or avail
+        _idx, text = choices[r.randint(0, len(choices) - 1)]
+        recent.append(_idx)
+        if len(recent) > 3:
+            recent.pop(0)
+    else:
+        _idx, text = avail[r.randint(0, len(avail) - 1)]
+    return text.format(nickname=nickname) if using_named else text
+
+
 def _season_desc(state, season):
     """取得与当日天气相容的入季描写。"""
     spec = SEASON_ENV[season]
@@ -4493,6 +4845,24 @@ def _pick_ambient(state, arr):
     return avail[state["turn"] % len(avail)]
 
 
+def _pick_settler_ambient(state):
+    """observe 定居者段：仅在同种唯一时把文案绑定到该具体个体。"""
+    named_candidates = []
+    for species, pool in OBSERVE_SETTLER_NAMED.items():
+        lives = [s for s in state.get("settlers", []) if s.get("name") == species]
+        if len(lives) != 1 or not lives[0].get("nickname"):
+            continue
+        for item in pool:
+            text, deps, weathers = _text_parts(item)
+            if (weathers is None or _weather(state) in weathers) \
+                    and all(_ambient_present(state, dep) for dep in deps):
+                named_candidates.append((lives[0], item))
+    if named_candidates:
+        settler, item = named_candidates[state["turn"] % len(named_candidates)]
+        return _pick_settler_text(state, None, settler, [item], [item], mode="first")
+    return _pick_ambient(state, OBSERVE_AMBIENT["settler"])
+
+
 def _pick_idx_avoid(r, n, recent):
     """随机取一个不在 recent（最近用过）里的索引，避免短期重复。"""
     choices = [i for i in range(n) if i not in recent]
@@ -4507,9 +4877,17 @@ SHORT_HUNT = {
     "miss": "%s照常扑了个空。",
     "absent": "%s在水边守了一阵，没有出手。",
 }
+SHORT_HUNT_NAMED = {
+    species: {
+        "hit": "{nickname}（%s）照常捕到了一条鱼。" % species,
+        "miss": "{nickname}（%s）照常扑了个空。" % species,
+        "absent": "{nickname}（%s）在水边守了一阵，没有出手。" % species,
+    }
+    for species in ("翠鸟", "苍鹭")
+}
 
 
-def _hunt_emit(state, s, events, r, arr, kind):
+def _hunt_emit(state, s, events, r, arr, kind, named_arr=None):
     """发出一条捕食描写：最近 3 条不重复；连续完整描写 3 天后降格/省略（item 8）。
 
     kind: 'hit' 用 settler_hunt 标签，'miss'/'absent' 用 settler_miss 标签。
@@ -4519,14 +4897,21 @@ def _hunt_emit(state, s, events, r, arr, kind):
         # 连续完整描写已达 3 天：降格为简短一句，偶数回合干脆不出现在文字里
         if state["turn"] % 2 == 0:
             return
-        events.append("%s:%s" % (tag, SHORT_HUNT[kind] % s["name"]))
+        short = _pick_settler_text(
+            state, r, s, [SHORT_HUNT[kind] % s["name"]],
+            [SHORT_HUNT_NAMED[s["name"]][kind]], mode="first",
+        )
+        events.append("%s:%s" % (tag, short))
         return
     recent = s.setdefault("recent_%s" % kind, [])
-    idx = _pick_idx_avoid(r, len(arr), recent)
-    recent.append(idx)
-    if len(recent) > 3:
-        recent.pop(0)
-    events.append("%s:%s" % (tag, arr[idx]))
+    if named_arr is None:
+        pools = SETTLER_HUNT_TEXT_NAMED.get(s["name"])
+        if pools:
+            named_arr = pools[{"hit": 0, "miss": 1, "absent": 2}[kind]]
+    text = _pick_settler_text(
+        state, r, s, arr, named_arr, mode="recent", recent=recent,
+    )
+    events.append("%s:%s" % (tag, text))
     s["desc_streak"] = s.get("desc_streak", 0) + 1
 
 
@@ -4572,17 +4957,21 @@ def _settler_hunt(state, s, hunter, events, r):
                     s["health"] = round(min(1.0, s["health"] + 0.1), 3)
                     s["since_hunt"] = 0
                     if s["name"] == "翠鸟" and caught == "鳑鲏":
-                        _hunt_emit(state, s, events, r, KINGFISHER_HIT_PANGPI, "hit")
+                        _hunt_emit(state, s, events, r, KINGFISHER_HIT_PANGPI, "hit",
+                                   KINGFISHER_HIT_PANGPI_NAMED)
                     elif s["name"] == "苍鹭" and caught == "草鱼":
-                        _hunt_emit(state, s, events, r, HERON_HIT_GRASS_CARP, "hit")
+                        _hunt_emit(state, s, events, r, HERON_HIT_GRASS_CARP, "hit",
+                                   HERON_HIT_GRASS_CARP_NAMED)
                     else:
                         _hunt_emit(state, s, events, r, hit_arr, "hit")
             else:
                 first_available = next((p for p in prey_list if pop.get(p, 0) >= 1), None)
                 if s["name"] == "翠鸟" and first_available == "鳑鲏":
-                    _hunt_emit(state, s, events, r, KINGFISHER_MISS_PANGPI, "miss")
+                    _hunt_emit(state, s, events, r, KINGFISHER_MISS_PANGPI, "miss",
+                               KINGFISHER_MISS_PANGPI_NAMED)
                 elif s["name"] == "苍鹭" and first_available == "草鱼":
-                    _hunt_emit(state, s, events, r, HERON_MISS_GRASS_CARP, "miss")
+                    _hunt_emit(state, s, events, r, HERON_MISS_GRASS_CARP, "miss",
+                               HERON_MISS_GRASS_CARP_NAMED)
                 else:
                     _hunt_emit(state, s, events, r, miss_arr, "miss")
                 s["since_hunt"] = s.get("since_hunt", 0) + 1
@@ -4647,12 +5036,20 @@ def _settler_warn_chronicle(state, s):
         s["warn_level"] = 2
         if day_key not in warn_dedup:
             warn_dedup[day_key] = True
-            _chronicle(state, SETTLER_WARN_CHRON_HEAVY % name, key=False)
+            warning = _pick_settler_text(
+                state, None, s, [SETTLER_WARN_CHRON_HEAVY % name],
+                [SETTLER_WARN_CHRON_HEAVY_NAMED], mode="first",
+            )
+            _chronicle(state, warning, key=False)
     elif 0.3 <= h < 0.5 and lvl < 1:
         s["warn_level"] = 1
         if day_key not in warn_dedup:
             warn_dedup[day_key] = True
-            _chronicle(state, SETTLER_WARN_CHRON_LIGHT % name, key=False)
+            warning = _pick_settler_text(
+                state, None, s, [SETTLER_WARN_CHRON_LIGHT % name],
+                [SETTLER_WARN_CHRON_LIGHT_NAMED], mode="first",
+            )
+            _chronicle(state, warning, key=False)
     elif h >= 0.5 and lvl != 0:
         s["warn_level"] = 0
 
@@ -4675,13 +5072,16 @@ def _process_settlers(state, events, r):
                 hibs.append({"sleep": state["turn"]})
                 if len(hibs) > 2:
                     del hibs[:len(hibs) - 2]
-                if name == "水蛇":
-                    events.append("settler:水蛇缓缓盘紧身体，钻进芦苇根部的枯叶堆里，一动不动。")
-                    _chronicle(state, "水蛇钻进芦苇根部，开始冬眠。")
-                else:
-                    events.append("settler:乌龟缩进壳里，慢慢沉到水底的淤泥中。"
-                                  "它不吃也不动，把整个冬天睡了过去。")
-                    _chronicle(state, "乌龟潜入水底淤泥，开始冬眠。")
+                sleep_text = _pick_settler_text(
+                    state, None, s, SETTLER_HIBERNATE_TEXT[name],
+                    SETTLER_HIBERNATE_TEXT_NAMED[name], mode="first",
+                )
+                events.append("settler:" + sleep_text)
+                sleep_chron = _pick_settler_text(
+                    state, None, s, [SETTLER_HIBERNATE_CHRON[name]],
+                    [SETTLER_HIBERNATE_CHRON_NAMED[name]], mode="first",
+                )
+                _chronicle(state, sleep_chron)
             if s["health"] >= 0.9:
                 s["high_health_days"] = s.get("high_health_days", 0) + 1
             rec = state["folio"]["settlers"].setdefault(name, {"times": 0, "max_days": 0})
@@ -4695,13 +5095,16 @@ def _process_settlers(state, events, r):
             hibs = s.setdefault("hibernations", [])
             if hibs and "wake" not in hibs[-1]:
                 hibs[-1]["wake"] = state["turn"]
-            if name == "水蛇":
-                events.append("settler:芦苇丛深处有什么在动。水蛇从枯叶堆里探出头，"
-                              "吐了吐信子，慢慢滑向水面。")
-                _chronicle(state, "水蛇结束冬眠，重新出没在池塘。")
-            else:
-                events.append("settler:" + _pick_t(state, TURTLE_WAKE_TEXT))
-                _chronicle(state, "乌龟结束冬眠，重新回到池塘。")
+            wake_text = _pick_settler_text(
+                state, None, s, SETTLER_WAKE_TEXT[name],
+                SETTLER_WAKE_TEXT_NAMED[name], mode="turn",
+            )
+            events.append("settler:" + wake_text)
+            wake_chron = _pick_settler_text(
+                state, None, s, [SETTLER_WAKE_CHRON[name]],
+                [SETTLER_WAKE_CHRON_NAMED[name]], mode="first",
+            )
+            _chronicle(state, wake_chron)
         # 幼体成长：到期转为独立定居者
         if s.get("juvenile"):
             s["juvenile_left"] = s.get("juvenile_left", cfg.get("juvenile_days", 0)) - 1
@@ -4709,12 +5112,20 @@ def _process_settlers(state, events, r):
                 s["juvenile"] = False
                 grown = SETTLER_GROWN.get(name)
                 if grown:
-                    pool = grown
-                    # 翠鸟幼体"叼着鲫鱼"文案需池塘有鱼，否则改用其他成长文案（补#6）
+                    # 翠鸟幼体"叼着鲫鱼"文案需池塘有鱼，否则确定性过滤该条。
+                    allow = None
                     if name == "翠鸟" and state["populations"].get("鲫鱼", 0) < 1:
-                        pool = [t for t in grown if "鲫鱼" not in _text_value(t)] or grown
-                    events.append("settler_grown:" + _pick_weather(state, r, pool))
-                _chronicle(state, SETTLER_GROWN_CHRON % name)
+                        allow = lambda text: "鲫鱼" not in text
+                    grown_text = _pick_settler_text(
+                        state, r, s, grown, SETTLER_GROWN_NAMED.get(name),
+                        allow=allow,
+                    )
+                    events.append("settler_grown:" + grown_text)
+                grown_chron = _pick_settler_text(
+                    state, None, s, [SETTLER_GROWN_CHRON % name],
+                    [SETTLER_GROWN_CHRON_NAMED], mode="first",
+                )
+                _chronicle(state, grown_chron)
         # 摄食
         if s.get("juvenile"):
             # 幼体不自己捕食，靠父母多养一张嘴：额外消耗一份口粮
@@ -4749,29 +5160,61 @@ def _process_settlers(state, events, r):
             s.get("high_health_days", 0) // 5, base_max_age // 5
         )
         if s["health"] <= 0:
-            leave = txt.get("starve", "%s 找不到食物，离开了池塘。" % name)
-            leave_chron = txt.get("starve_chron", leave)
+            leave_unnamed = txt.get("starve", "%s 找不到食物，离开了池塘。" % name)
+            leave_named = SETTLER_LEAVE_NAMED.get(name, {}).get("starve")
+            leave = _pick_settler_text(
+                state, None, s, [leave_unnamed], [leave_named] if leave_named else None,
+                mode="first",
+            )
+            chron_unnamed = txt.get("starve_chron", leave_unnamed)
+            chron_named = SETTLER_LEAVE_NAMED.get(name, {}).get("starve_chron", leave_named)
+            leave_chron = _pick_settler_text(
+                state, None, s, [chron_unnamed], [chron_named] if chron_named else None,
+                mode="first",
+            )
             leave_reason = "food"
         elif s["age"] >= extended_max_age:
             longevity_leave = s["age"] > base_max_age
             if longevity_leave:
-                leave = _pick_t(state, LONGEVITY_LEAVE_TEXT[name])
+                leave = _pick_settler_text(
+                    state, None, s, LONGEVITY_LEAVE_TEXT[name],
+                    LONGEVITY_LEAVE_TEXT_NAMED.get(name), mode="turn",
+                )
             else:
-                leave = txt.get("age", "年迈的%s悄然离去。" % name)
-            leave_chron = txt.get("age_chron", leave)
+                leave_unnamed = txt.get("age", "年迈的%s悄然离去。" % name)
+                leave_named = SETTLER_LEAVE_NAMED.get(name, {}).get("age")
+                leave = _pick_settler_text(
+                    state, None, s, [leave_unnamed], [leave_named] if leave_named else None,
+                    mode="first",
+                )
+            chron_unnamed = txt.get("age_chron", txt.get("age", leave))
+            chron_named = SETTLER_LEAVE_NAMED.get(name, {}).get("age_chron")
+            if chron_named is None and not longevity_leave:
+                chron_named = SETTLER_LEAVE_NAMED.get(name, {}).get("age")
+            leave_chron = _pick_settler_text(
+                state, None, s, [chron_unnamed], [chron_named] if chron_named else None,
+                mode="first",
+            )
             leave_reason = "old_age"
         # 冬季翠鸟：离开改用冬季专属文案（年鉴仍按原因记录）
         if leave and not longevity_leave and season == "冬" and name == "翠鸟":
-            leave = _pick(r, KINGFISHER_WINTER_LEAVE)
+            leave = _pick_settler_text(
+                state, r, s, KINGFISHER_WINTER_LEAVE, KINGFISHER_WINTER_LEAVE_NAMED,
+            )
         # 冬季翠鸟日常描写：15% 概率一条，按 health 分档。纯文案，不影响捕食判定
         elif not leave and season == "冬" and name == "翠鸟" and r.chance(0.15):
             if s["health"] > 0.6:
                 pool = KINGFISHER_WINTER_DAILY
+                named_pool = KINGFISHER_WINTER_DAILY_NAMED
             elif s["health"] >= 0.3:
                 pool = KINGFISHER_WINTER_HUNGRY
+                named_pool = KINGFISHER_WINTER_HUNGRY_NAMED
             else:
                 pool = KINGFISHER_WINTER_CRITICAL
-            events.append("settler_winter:" + _pick(r, pool))
+                named_pool = KINGFISHER_WINTER_CRITICAL_NAMED
+            events.append("settler_winter:" + _pick_settler_text(
+                state, r, s, pool, named_pool,
+            ))
         if leave:
             events.append("settler_leave:" + leave)
             _chronicle(state, leave_chron)
@@ -5981,6 +6424,23 @@ def _choice_title_from_text(text):
     return "池畔抉择"
 
 
+def _matches_named_text(body, item):
+    """判断已填昵称的正文是否来自某条 {nickname} 模板。"""
+    template = _text_value(item)
+    if "{nickname}" not in template:
+        return False
+    pattern = re.escape(template).replace(re.escape("{nickname}"), ".+?")
+    return re.fullmatch(pattern, body) is not None
+
+
+def _named_pool_species(body, pools):
+    for species, pool in pools.items():
+        items = pool if isinstance(pool, (list, tuple)) else [pool]
+        if any(_matches_named_text(body, item) for item in items):
+            return species
+    return None
+
+
 def _classify_event(ev):
     """把内部事件标签解析为结构化信息：type / name（标题）/ effect（影响）。
 
@@ -6049,22 +6509,45 @@ def _classify_event(ev):
             meta["name"] = "乌龟苏醒"
             meta["effect"] = "结束冬眠"
         else:
-            who = next((n for n in SETTLER_TYPES if n in body), "定居者")
+            who = next((n for n in SETTLER_TYPES if n in body), None)
+            who = who or _named_pool_species(
+                body, {n: SETTLER_HIBERNATE_TEXT_NAMED[n] + SETTLER_WAKE_TEXT_NAMED[n]
+                       for n in SETTLER_HIBERNATE_TEXT_NAMED})
+            who = who or "定居者"
             meta["name"] = who + "事件"
             meta["effect"] = "定居者动态"
     elif tag == "settler_hunt":
-        who = next((n for n in ("翠鸟", "苍鹭") if n in body), "定居者")
+        who = next((n for n in ("翠鸟", "苍鹭") if n in body), None)
+        who = who or _named_pool_species(body, {
+            "翠鸟": KINGFISHER_HIT_NAMED + KINGFISHER_HIT_PANGPI_NAMED,
+            "苍鹭": HERON_HIT_NAMED + HERON_HIT_GRASS_CARP_NAMED,
+        }) or "定居者"
         meta["name"] = who + "捕食"
         meta["effect"] = "捕食成功"
+        meta["subject"] = who
     elif tag == "settler_miss":
-        who = next((n for n in ("翠鸟", "苍鹭") if n in body), "定居者")
+        who = next((n for n in ("翠鸟", "苍鹭") if n in body), None)
+        who = who or _named_pool_species(body, {
+            "翠鸟": KINGFISHER_MISS_NAMED + KINGFISHER_MISS_PANGPI_NAMED
+                    + SETTLER_ABSENT_NAMED["翠鸟"] + list(SHORT_HUNT_NAMED["翠鸟"].values()),
+            "苍鹭": HERON_MISS_NAMED + HERON_MISS_GRASS_CARP_NAMED
+                  + SETTLER_ABSENT_NAMED["苍鹭"] + list(SHORT_HUNT_NAMED["苍鹭"].values()),
+        }) or "定居者"
         meta["name"] = who + "扑空"
         meta["effect"] = "扑空"
+        meta["subject"] = who
     elif tag == "settler_leave":
         # 冬季翠鸟的离开文案多半不点名（"枯枝空了"），按文案池反查主体
         who = next((n for n in SETTLER_TYPES if n in body), None)
         if who is None:
-            who = "翠鸟" if body in KINGFISHER_WINTER_LEAVE else "定居者"
+            leave_named = {
+                n: list(LONGEVITY_LEAVE_TEXT_NAMED[n])
+                   + list(SETTLER_LEAVE_NAMED.get(n, {}).values())
+                for n in SETTLER_TYPES
+            }
+            leave_named["翠鸟"] += KINGFISHER_WINTER_LEAVE_NAMED
+            who = _named_pool_species(body, leave_named)
+            who = who or ("翠鸟" if body in KINGFISHER_WINTER_LEAVE else "定居者")
         meta["name"] = who + "离开"
         meta["effect"] = "离开池塘"
     elif tag == "settler_return":
@@ -6086,7 +6569,8 @@ def _classify_event(ev):
         meta["name"] = who + "繁殖"
         meta["effect"] = "添了新一代"
     elif tag == "settler_grown":
-        who = next((n for n in SETTLER_TYPES if n in body), "定居者")
+        who = next((n for n in SETTLER_TYPES if n in body), None)
+        who = who or _named_pool_species(body, SETTLER_GROWN_NAMED) or "定居者"
         meta["name"] = who + "成年"
         meta["effect"] = "幼体长成"
     elif tag == "achievement":
@@ -6189,7 +6673,7 @@ def _observe_ambient(state):
                    or _text_value(OBSERVE_AMBIENT["default"][1]))
     if state.get("settlers"):
         # 定居者段只输出当前实际在场的定居者对应文案
-        settler_txt = _pick_ambient(state, OBSERVE_AMBIENT["settler"])
+        settler_txt = _pick_settler_ambient(state)
         if settler_txt:
             return environ + "\n\n" + settler_txt
     return environ
@@ -6214,9 +6698,15 @@ def _settler_warn_lines(state):
         h = s["health"]
         name = s["name"]
         if h < 0.3 and name in SETTLER_WARN_HEAVY:
-            out.append("· " + _pick_t(state, SETTLER_WARN_HEAVY[name]))
+            out.append("· " + _pick_settler_text(
+                state, None, s, SETTLER_WARN_HEAVY[name],
+                SETTLER_WARN_HEAVY_NAMED.get(name), mode="turn",
+            ))
         elif h < 0.5 and name in SETTLER_WARN_LIGHT:
-            out.append("· " + _pick_t(state, SETTLER_WARN_LIGHT[name]))
+            out.append("· " + _pick_settler_text(
+                state, None, s, SETTLER_WARN_LIGHT[name],
+                SETTLER_WARN_LIGHT_NAMED.get(name), mode="turn",
+            ))
     return out
 
 
@@ -6245,7 +6735,11 @@ def _settler_prey_gone_lines(state):
         flag = "prey_gone_%s" % name
         if all_gone:
             if not flags.get(flag):
-                out.append("· " + SETTLER_PREY_GONE[name])
+                named = SETTLER_PREY_GONE_NAMED.get(name)
+                out.append("· " + _pick_settler_text(
+                    state, None, s, [SETTLER_PREY_GONE[name]],
+                    [named] if named else None, mode="first",
+                ))
                 flags[flag] = True
         elif flags.get(flag):
             flags[flag] = False
@@ -6337,7 +6831,10 @@ def _settler_hint_lines(state):
         hint = SETTLER_HINTS.get(name)
         if not hint:          # 占位为空：不追加，也不标记，待文案填入后仍可触发
             continue
-        out.append("· " + hint)
+        named = SETTLER_HINTS_NAMED.get(name)
+        out.append("· " + _pick_settler_text(
+            state, None, s, [hint], [named] if named else None, mode="first",
+        ))
         flags[flag] = True
     return out
 
@@ -6501,10 +6998,10 @@ def _advance(state, days):
                     if fm:
                         fish_taken += int(fm.group(1))
             elif tag == "settler_hunt":
-                who = next((n for n in ("翠鸟", "苍鹭") if n in meta["body"]), "定居者")
+                who = meta.get("subject") or "定居者"
                 hunt_hit[who] = hunt_hit.get(who, 0) + 1
             elif tag == "settler_miss":
-                who = next((n for n in ("翠鸟", "苍鹭") if n in meta["body"]), "定居者")
+                who = meta.get("subject") or "定居者"
                 hunt_miss[who] = hunt_miss.get(who, 0) + 1
             elif tag in ("crisis", "disaster", "legend", "achievement",
                          "discover", "settler", "settler_leave", "settler_birth", "report",
@@ -7431,19 +7928,15 @@ def _cmd_gaze(state):
     for s in state.get("settlers", []):
         tmpl = GAZE_SETTLER.get(s["name"])
         if tmpl:
-            allowed = [i for i, item in enumerate(tmpl)
-                       if _text_parts(item)[2] is None
-                       or _weather(state) in _text_parts(item)[2]]
             # 翠鸟"叼着小鱼"文案需池塘里有鱼才出现，否则降级到其他翠鸟文案（二轮#1）
+            allow = None
             if s["name"] == "翠鸟" and pop.get("鲫鱼", 0) <= 0:
-                allowed = [i for i in allowed if "小鱼" not in _text_value(tmpl[i])] or allowed
+                allow = lambda text: "小鱼" not in text
             recent = s.setdefault("recent_gaze", [])
-            choices = [i for i in allowed if i not in recent] or allowed
-            idx = choices[r.randint(0, len(choices) - 1)]
-            recent.append(idx)
-            if len(recent) > 3:
-                recent.pop(0)
-            lines.append(_text_value(tmpl[idx]))
+            lines.append(_pick_settler_text(
+                state, r, s, tmpl, GAZE_SETTLER_NAMED.get(s["name"]),
+                mode="recent", recent=recent, allow=allow,
+            ))
 
     # 冬季玩法延迟反馈（凿冰洞 / 落叶床，一次性，同样在 gaze 里体现）
     lines.extend(_winter_action_hints(state))

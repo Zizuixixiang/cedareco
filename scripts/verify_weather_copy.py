@@ -26,16 +26,20 @@ def annotated_pools():
     pools.extend(engine.GAZE_ENV.values())
     pools.extend(engine.GAZE_SUBJECT.values())
     pools.extend(engine.GAZE_SETTLER.values())
+    pools.extend(engine.GAZE_SETTLER_NAMED.values())
     pools.append(engine.GAZE_EMPTY)
     pools.extend(engine.OBSERVE_AMBIENT.values())
+    pools.extend(engine.OBSERVE_SETTLER_NAMED.values())
     pools.extend(v for v in engine.SEASON_TEXT.values() if isinstance(v, list))
     pools.extend(engine.CHOICE_EVENTS[key]["desc_pool"] for key in ("干旱", "热浪"))
     pools.extend(engine.PAIR_SETTLE_TEXT.values())
     pools.extend(engine.SETTLER_GROWN.values())
+    pools.extend(engine.SETTLER_GROWN_NAMED.values())
     pools.extend(engine.SETTLER_INTERACTIONS.values())
     pools.extend(engine.DISEASE_ONSET.values())
     pools.extend((engine.DISEASE_SPREAD, engine.DISEASE_PEAK, engine.DISEASE_END))
     pools.extend((engine.TURTLE_WAKE_TEXT, engine.FIREFLY_LEGEND_TEXT))
+    pools.extend(engine.SETTLER_WAKE_TEXT_NAMED.values())
     return pools
 
 
