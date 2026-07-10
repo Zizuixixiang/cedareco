@@ -7766,6 +7766,26 @@ def _json_observe_text(state):
     return _observe_text(snapshot, list(snapshot.get("log", [])))
 
 
+def _json_return_days(records):
+    """Project return history to the day values rendered by folio."""
+    return [
+        {"day": record.get("day")}
+        for record in (records or [])
+        if isinstance(record, dict) and record.get("day") is not None
+    ]
+
+
+def _json_folio_resident(life):
+    """Project one resident life to fields visible in the folio index."""
+    return {
+        "name": life.get("name"),
+        "nickname": life.get("nickname"),
+        "arrive_day": life.get("arrive_day"),
+        "leave_day": life.get("leave_day"),
+        "return_records": _json_return_days(life.get("return_records")),
+    }
+
+
 def api_state(state):
     """只读 JSON 状态投影；字段可见性与 status/observe 对齐。"""
     env = state["env"]
@@ -7805,10 +7825,16 @@ def api_state(state):
             "status": status,
             "health": _health_word(s.get("health", 0)),
             "health_value": round(s.get("health", 0), 3),
-            "origin": s.get("origin", "arrived"),
-            "return_records": list(s.get("return_records", [])),
-            "descendant_of": s.get("descendant_of"),
         })
+    active_weather = state.get("active_weather")
+    if isinstance(active_weather, dict):
+        active_weather = {
+            "kind": active_weather.get("kind"),
+            "elapsed": active_weather.get("elapsed"),
+            "duration": active_weather.get("duration"),
+        }
+    else:
+        active_weather = None
     hy = state.get("flags", {}).get("water_hyacinth")
     water_hyacinth_cover = None
     if isinstance(hy, dict) and state["turn"] >= hy.get("day", 0) + 3:
@@ -7853,7 +7879,7 @@ def api_state(state):
         ],
         "settlers": settlers,
         "disasters": {
-            "active_weather": state.get("active_weather"),
+            "active_weather": active_weather,
             "invasion": _active_invasion(state),
             "water_hyacinth_cover": water_hyacinth_cover,
             "biological": biological,
@@ -7923,18 +7949,22 @@ def api_folio(state):
     settlers = []
     for name, rec in cod["settlers"].items():
         here = [s for s in state["settlers"] if s["name"] == name]
-        residents = list(rec.get("residents", []))
-        residents.extend({
-            "name": s.get("name"),
-            "species": s.get("name"),
-            "nickname": s.get("nickname"),
-            "arrive_day": s.get("arrive_day", max(0, state["turn"] - s.get("age", 0))),
-            "leave_day": None,
-            "hibernations": s.get("hibernations", []),
-            "origin": s.get("origin", "arrived"),
-            "return_records": list(s.get("return_records", [])),
-            "descendant_of": s.get("descendant_of"),
-        } for s in here)
+        residents = [
+            _json_folio_resident(life)
+            for life in rec.get("residents", [])[-3:]
+        ]
+        residents.extend(
+            _json_folio_resident({
+                "name": s.get("name"),
+                "nickname": s.get("nickname"),
+                "arrive_day": s.get(
+                    "arrive_day", max(0, state["turn"] - s.get("age", 0))
+                ),
+                "leave_day": None,
+                "return_records": s.get("return_records", []),
+            })
+            for s in here[:2]
+        )
         settlers.append({
             "species": name,
             "settle_count": rec.get("times", 0),
@@ -7944,9 +7974,6 @@ def api_folio(state):
                     "label": _settler_label(s),
                     "age": s.get("age", 0),
                     "health": _health_word(s.get("health", 0)),
-                    "origin": s.get("origin", "arrived"),
-                    "return_records": list(s.get("return_records", [])),
-                    "descendant_of": s.get("descendant_of"),
                 }
                 for s in here
             ],
@@ -7988,7 +8015,13 @@ def api_species(state, name):
     if resolved is None or resolved not in _unlocked_set(state):
         return None
     sp = SPECIES[resolved]
-    lc = sp.get("lifecycle")
+    lifecycle = sp.get("lifecycle")
+    if lifecycle:
+        lifecycle = {
+            "stage_days": lifecycle.get("stage_days"),
+            "into": lifecycle.get("into"),
+            "ratio": lifecycle.get("ratio"),
+        }
     return {
         "name": resolved,
         "trophic": sp["trophic"],
@@ -7997,7 +8030,7 @@ def api_species(state, name):
         "birth_rate": sp["birth_rate"],
         "death_rate": sp["death_rate"],
         "max_capacity": sp["max_capacity"],
-        "lifecycle": copy.deepcopy(lc) if lc else None,
+        "lifecycle": lifecycle,
         "current_count": _ipop(state, resolved),
     }
 
