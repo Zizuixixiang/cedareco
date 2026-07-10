@@ -6500,11 +6500,17 @@ def _cmd_folio(state):
         start = life.get("arrive_day")
         end = "至今" if live else life.get("leave_day")
         if start is not None and end is not None:
-            span = "第%d天至今" % start if live else "第%d-%d天" % (start, end)
-            rets = life.get("return_records") or []
-            span += "".join(
-                "、第%d天归来" % r.get("day")
-                for r in rets if isinstance(r, dict) and r.get("day") is not None)
+            rets = [r for r in (life.get("return_records") or [])
+                    if isinstance(r, dict) and r.get("day") is not None]
+            if live:
+                # 在塘个体：本段起点即归来日时写"归来至今"，避免同日重复
+                if rets and rets[-1].get("day") == start:
+                    span = "第%d天归来至今" % start
+                else:
+                    span = "第%d天至今" % start
+            else:
+                span = "第%d-%d天" % (start, end)
+                span += "".join("、第%d天归来" % r["day"] for r in rets)
             text = "%s（%s）" % (label, span)
         else:
             text = label
