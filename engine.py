@@ -20,6 +20,12 @@ import copy
 
 SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eco_save.json")
 
+# 文案天气依赖：明确的阳光意象只在能见日照的天气使用；较泛的天光、
+# 光斑、光柱意象还允许阴天，但排除雨、雪、雾等会与天气首句冲突的天气。
+# 使用允许集合而不是排除集合，后续新增恶劣天气时会默认过滤这些文案。
+SUNLIGHT_WEATHERS = frozenset(("晴", "多云", "大风", "春寒", "秋霜"))
+DAYLIGHT_WEATHERS = frozenset(("晴", "多云", "阴", "大风", "春寒", "秋霜"))
+
 # ---------------------------------------------------------------------------
 # 1. PRNG —— mulberry32（确定性，可序列化）
 # ---------------------------------------------------------------------------
@@ -318,22 +324,22 @@ SETTLER_PREY_GONE = {
 # key 为"当前季节"（即将过渡到下一季）。每季 5 条，按回合确定性取用。
 SEASON_OMEN = {
     "春": [  # 春 → 夏
-        "风不再是凉的了。午后水面蒸起一层薄薄的热气，光变得白了些，照在水上有些晃眼。",
+        ("风不再是凉的了。午后水面蒸起一层薄薄的热气，光变得白了些，照在水上有些晃眼。", (), DAYLIGHT_WEATHERS),
         "空气里那股湿润的草气淡了，取而代之的是一种闷闷的暖。池塘的呼吸变深了。",
-        "水面上的光从斜斜的一道，变成了直直的一片。正午的时候，水底的石子亮得发白。",
+        ("水面上的光从斜斜的一道，变成了直直的一片。正午的时候，水底的石子亮得发白。", (), SUNLIGHT_WEATHERS),
         "青蛙不再叫了。不是不叫，是改到了傍晚。白天它们躲在阴处，鼓着眼，等热气散。",
-        "水蚤比春天密了一倍。光柱里密密麻麻，跳动的影子挤在一起，像是水自己在沸腾。",
+        ("水蚤比春天密了一倍。光柱里密密麻麻，跳动的影子挤在一起，像是水自己在沸腾。", (), DAYLIGHT_WEATHERS),
     ],
     "夏": [  # 夏 → 秋
         "傍晚的风擦过水面，带着一丝说不清的凉。蝉声还是响的，但有一片黄叶从芦苇丛上飘了下来。",
-        "光的角度变了。午后的光不再是直直砸下来的，而是斜斜地铺开，颜色暖了一层。",
+        ("光的角度变了。午后的光不再是直直砸下来的，而是斜斜地铺开，颜色暖了一层。", (), SUNLIGHT_WEATHERS),
         "蝉声稀了。前几天还响成一片，现在东一声西一声，中间隔着长长的沉默。",
         "水色转深了。夏天那种亮晃晃的浅绿褪了，变成一种沉静的墨绿，像是在收着什么。",
         "燕子贴着水面掠过的次数少了。有一天一只也没来，水面空空荡荡，只有风在上面画纹。",
     ],
     "秋": [  # 秋 → 冬
         "风不再是凉的了，是冷的。水面被吹得起了一层细密的疙瘩，芦苇瑟瑟地抖着，穗子快掉光了。",
-        "早晨水边凝了一层薄薄的冰碴，太阳出来就化了，但化得比昨天慢了。空气里有了冬天的味道。",
+        ("早晨水边凝了一层薄薄的冰碴，太阳出来就化了，但化得比昨天慢了。空气里有了冬天的味道。", (), SUNLIGHT_WEATHERS),
         "最后一批黄叶落尽了。芦苇光秃秃地立着，风从它们中间穿过去，声音比有叶子的时候更尖。",
         "鱼沉得很深。水面上的动静越来越少，偶尔一串气泡冒上来，也很快碎了。",
         "傍晚来得快了。刚才还是亮的，一转头天就暗了，池塘早早地沉进了灰色里。",
@@ -622,7 +628,7 @@ SETTLER_GROWN = {
     ],
     "流浪乌龟": [
         "小龟的壳变硬了。它在水底慢慢爬过一块石头，壳擦过石面，发出一声轻响——不再是软的。",
-        "小龟第一次爬上那块半露出水面的石头，脖子伸得老长，学着大龟的样子晒太阳。",
+        ("小龟第一次爬上那块半露出水面的石头，脖子伸得老长，学着大龟的样子晒太阳。", (), SUNLIGHT_WEATHERS),
         "它在水底找到一片水藻，自己啃了起来。石面上多了一小块干净的灰白。",
         "那只小龟不再躲进石缝里了。它在水底慢慢爬过，身后扬起一小片泥沙，像一个微型的犁。",
         "乌龟趴在那块老石头上，壳上的纹路已经深了一层。谁也记不清它是什么时候从沙坑里爬出来的了。",
@@ -638,10 +644,16 @@ SETTLER_GROWN = {
         "幼蛇第一次独自滑入水中，细长的身体切开水面，留下一道浅浅的波纹。它游到对岸，又游回来。",
         "小蛇在芦苇丛里蜕了第一次皮，半透明的蛇蜕挂在枯茎上轻轻晃动。它的鳞片变深了一层。",
         "它第一次盯住了猎物。一只青蛙从面前跳过，幼蛇出击——慢了。青蛙逃开了。小蛇收回身子，重新盘好。",
-        "幼蛇不再盘在芦苇根部了。它在岸边一块石头上摊开身体，鳞片晒得发亮。",
+        ("幼蛇不再盘在芦苇根部了。它在岸边一块石头上摊开身体，鳞片晒得发亮。", (), SUNLIGHT_WEATHERS),
         "水蛇悄无声息地游过水面，头探向岸边，又慢慢收回去。没有人再能分出它是哪一年破壳的了。",
     ],
 }
+
+TURTLE_WAKE_TEXT = [
+    ("乌龟从淤泥里探出头来，壳上还沾着泥。它慢吞吞爬向有阳光的浅水，冬眠结束了。",
+     (), SUNLIGHT_WEATHERS),
+    "乌龟从淤泥里探出头来，壳上还沾着泥。它慢吞吞爬回浅水，冬眠结束了。",
+]
 
 SETTLER_BREED_CHRON = "%s 在池塘繁衍了下一代——池塘有了二代住客。"
 SETTLER_GROWN_CHRON = "那只幼年的%s长成了，开始独自在池塘讨生活。"
@@ -765,10 +777,10 @@ CHOICE_EVENTS = {
     "干旱": {
         "desc": "日光一天接一天地晒着。水面缓缓退下去，泥岸上裂出细密的纹路，像一张渴了很久的嘴。",
         "desc_pool": [
-            "日光一天接一天地晒着。水面缓缓退下去，泥岸上裂出细密的纹路，像一张渴了很久的嘴。",
+            ("日光一天接一天地晒着。水面缓缓退下去，泥岸上裂出细密的纹路，像一张渴了很久的嘴。", (), SUNLIGHT_WEATHERS),
             "水位线在石头上留下一道干涸的印记，那道印一天比一天高。石头露出水面的部分越来越多。",
-            "池塘在缩小。岸边的泥被晒得发白，边缘卷起来，踩上去会脆生生地裂开。",
-            "水面离岸越来越远，露出一圈干裂的泥滩。几片枯叶贴在泥上，被太阳晒得卷了边。",
+            ("池塘在缩小。岸边的泥被晒得发白，边缘卷起来，踩上去会脆生生地裂开。", (), SUNLIGHT_WEATHERS),
+            ("水面离岸越来越远，露出一圈干裂的泥滩。几片枯叶贴在泥上，被太阳晒得卷了边。", (), SUNLIGHT_WEATHERS),
             "风吹过时不再带着水汽，而是干热的，夹着细尘。池塘在一天天熬着。",
         ],
         "requires": [],
@@ -778,11 +790,11 @@ CHOICE_EVENTS = {
     "热浪": {
         "desc": "热空气压着池塘。水面纹丝不动，光直直打在上面，反射出一片晃眼的白。",
         "desc_pool": [
-            "热空气压着池塘。水面纹丝不动，光直直打在上面，反射出一片晃眼的白。",
+            ("热空气压着池塘。水面纹丝不动，光直直打在上面，反射出一片晃眼的白。", (), SUNLIGHT_WEATHERS),
             "水面蒸着薄薄的热气，远看像一层透明的纱。水下的影子都沉在最深处，一动不动。",
             "连蝉都叫得发闷。池塘像是被扣在一口热锅里，空气黏稠，水汽散不出去。",
             "鱼浮上来换气，嘴张得比平时大，又慢。水面起了一层细密的气泡，聚在岸边。",
-            "烈日把水晒得温热，连阴影里都躲着暑气。池塘在喘，水草软软地垂着，不再冒泡。",
+            ("烈日把水晒得温热，连阴影里都躲着暑气。池塘在喘，水草软软地垂着，不再冒泡。", (), SUNLIGHT_WEATHERS),
         ],
         "requires": [],
         "choices": ["为池塘遮荫降温", "硬扛过去"],
@@ -997,6 +1009,11 @@ VISITOR_HINTS = {
     "仙鹤": "雾最浓的清晨，水面偶尔会立着一个不该那么高的影子。它不动，你不确定它是不是真的。",
 }
 
+FIREFLY_LEGEND_TEXT = [
+    ("满月之夜，无数萤火从草丛升起，水面落满流动的光。", (), SUNLIGHT_WEATHERS),
+    "夜色最深时，无数萤火从草丛升起，水面落满流动的光。",
+]
+
 # ---------------------------------------------------------------------------
 # 2e. gaze（凝视）微观描写模板
 # ---------------------------------------------------------------------------
@@ -1004,19 +1021,19 @@ VISITOR_HINTS = {
 
 GAZE_SEASON = {
     "春": [
-        "春日的光斜斜铺下，水面碎成一片金光。",
+        ("春日的光斜斜铺下，水面碎成一片金光。", (), SUNLIGHT_WEATHERS),
         "水还凉着，岸边的嫩芽带一点透明的绿。",
         "湿润的草气浮在空气里，涟漪懒懒地散开又消失。",
     ],
     "夏": [
         "正午的热气压着水面，蒸出黏糊糊的水汽。",
-        "烈日把水晒得温热，阴影里也躲着暑气。",
-        "蝉声从草丛涌起，水面白得晃眼。",
+        ("烈日把水晒得温热，阴影里也躲着暑气。", (), SUNLIGHT_WEATHERS),
+        ("蝉声从草丛涌起，水面白得晃眼。", (), DAYLIGHT_WEATHERS),
     ],
     "秋": [
         "枯叶旋落，水面接住它，秋光淡了。",
         "凉风擦过水面，把最后一丝热也带走了。",
-        "午后光线如蜜，水面静止，像一面旧铜镜。",
+        ("午后光线如蜜，水面静止，像一面旧铜镜。", (), SUNLIGHT_WEATHERS),
     ],
     "冬": [
         "池边凝着冰凌，吐息在空中结成白气。",
@@ -1033,7 +1050,7 @@ GAZE_ENV = {
     ],
     "cover": [
         "浮萍盖满水面，底下是幽绿的昏暗。",
-        "浮萍遮住阳光，水下只剩几点浑浊的光斑。",
+        ("浮萍遮住阳光，水下只剩几点浑浊的光斑。", (), SUNLIGHT_WEATHERS),
         "绿毯铺满，深处的黑暗纹丝不动。",
     ],
     "turbid": [
@@ -1043,7 +1060,7 @@ GAZE_ENV = {
     ],
     "clear": [
         "水清见底，水草的每一丝摆动都看得分明。",
-        "阳光探到水底，沙石上小生命游过。",
+        ("阳光探到水底，沙石上小生命游过。", (), SUNLIGHT_WEATHERS),
         "水像通透的琥珀，把万物凝固其中。",
     ],
 }
@@ -1052,11 +1069,11 @@ GAZE_SUBJECT = {
     "水藻": [
         "水藻成片摇曳，光线穿过它们，碎成绿影。像水底的森林。",
         "绿丝上挂着气泡，一串串，向水面升去。",
-        "日光照透，水藻泛着幽幽翠色，缓缓舒展。",
+        ("日光照透，水藻泛着幽幽翠色，缓缓舒展。", (), SUNLIGHT_WEATHERS),
     ],
     "浮萍": [
         "浮萍挤挤挨挨，随细浪碰撞，分开，又聚拢。",
-        "几片浮萍打旋，影子在水面碎成光斑。",
+        ("几片浮萍打旋，影子在水面碎成光斑。", (), DAYLIGHT_WEATHERS),
         "绿毯上水珠滚动，偶尔一闪。",
     ],
     "芦苇": [
@@ -1066,7 +1083,7 @@ GAZE_SUBJECT = {
     ],
     "水蚤": [
         "水蚤成群跳动，细小的身子一弹一弹。",
-        "光柱里，水蚤浮沉，密得水都活了。",
+        ("光柱里，水蚤浮沉，密得水都活了。", (), DAYLIGHT_WEATHERS),
         "它们撞上水草，匆忙散开，又聚回。",
     ],
     "田螺": [
@@ -1098,7 +1115,7 @@ GAZE_SUBJECT = {
     ],
     "草鱼": [
         "草鱼从浮萍底下游过，宽厚的背擦着绿毯的底部，浮萍跟着它的方向轻轻隆起又落下。",
-        "它仰头咬住一片浮萍，嘴唇一张一合，浮萍被扯进嘴里。缺口处漏下一柱光，照在它青灰色的鳞上。",
+        ("它仰头咬住一片浮萍，嘴唇一张一合，浮萍被扯进嘴里。缺口处漏下一柱光，照在它青灰色的鳞上。", (), DAYLIGHT_WEATHERS),
         "草鱼的尾巴扫了一下，搅起一小团浑雾。它不慌不忙地游开，身后浮萍缺了一块，像拼图被取走了一片。",
         "浮萍被啃出一道弧形的缺口，边缘整齐，还在慢慢扩大。草鱼在缺口下方巡游，嘴时不时探上来再咬一口。",
         "它把半张脸探出浮萍的缝隙，嘴张了一下，又合上。几片浮萍碎屑从嘴边漂开，它慢慢沉下去，宽背重新没入暗处。",
@@ -1133,7 +1150,7 @@ GAZE_SUBJECT = {
     "蜻蜓成虫": [
         "蜻蜓掠过水面，翅翼闪出虹光。",
         "它在芦苇间盘旋，轻点水面，倏然远去。",
-        "蜻蜓停在枝头，纹丝不动，晒着薄翅。",
+        ("蜻蜓停在枝头，纹丝不动，晒着薄翅。", (), SUNLIGHT_WEATHERS),
     ],
     # ---- V1.0 扩展：新增 7 种凝视文案 ----
     "泥鳅": [
@@ -1158,7 +1175,7 @@ GAZE_SUBJECT = {
     ],
     "睡莲": [
         "睡莲的圆叶铺在水面，边缘微微卷起，水珠在上面滚动。",
-        "一朵白花开在莲叶间，花瓣张开，迎着午后的光。",
+        ("一朵白花开在莲叶间，花瓣张开，迎着午后的光。", (), SUNLIGHT_WEATHERS),
         "青蛙蹲在睡莲叶上，一动不动，叶子只是微微沉了一下。",
     ],
     "蟾蜍": [
@@ -1225,7 +1242,7 @@ GAZE_SUBJECT_ORDER = list(GAZE_SUBJECT.keys())
 
 GAZE_SETTLER = {
     "流浪乌龟": [
-        "乌龟趴在半露出水面的石头上，脖子伸得老长，一动不动地晒着太阳。",
+        ("乌龟趴在半露出水面的石头上，脖子伸得老长，一动不动地晒着太阳。", (), SUNLIGHT_WEATHERS),
         "它慢吞吞地啃着石面上的水藻，一下一下，石头露出一小块干净的灰白。",
         "乌龟把头缩进壳里，四爪也收了进去。水面荡过来一圈涟漪，它只是轻轻晃了一下。",
         "乌龟在水底慢慢爬过，壳擦过石块，发出一声轻闷的响。泥沙在它身后微微扬起又沉降。",
@@ -1239,9 +1256,9 @@ GAZE_SETTLER = {
         "一串细密的气泡从石缝里冒上来。螃蟹正在底下清理自己的壳，钳子够到背上，一下一下地刮。",
     ],
     "水蛇": [
-        "水蛇盘在芦苇根部，头枕在自己的身体上。鳞片在斜阳里泛着湿润的暗光。",
+        ("水蛇盘在芦苇根部，头枕在自己的身体上。鳞片在斜阳里泛着湿润的暗光。", (), SUNLIGHT_WEATHERS),
         "一道细长的波纹划过水面，水蛇的头探出来，又沉下去，留下一道渐渐消散的水痕。",
-        "水蛇把自己摊在岸边一块晒暖的石头上，全身舒展，鳞片慢慢变干，颜色浅了一层。",
+        ("水蛇把自己摊在岸边一块晒暖的石头上，全身舒展，鳞片慢慢变干，颜色浅了一层。", (), SUNLIGHT_WEATHERS),
         "芦苇丛里，半透明的蛇蜕挂在枯茎上轻轻晃动。不远处，水蛇换了一身新鳞，安静地蜷着。",
         "水蛇的下颌张开，慢慢吞下一只青蛙。吞了很久。然后它缓缓滑入水中，身体鼓着一个缓慢移动的结。",
     ],
@@ -1249,11 +1266,11 @@ GAZE_SETTLER = {
         "一对野鸭并排游过水面，颈子一前一后地摆动，身后两道波纹渐渐合成一片。",
         "野鸭把头埋进水里，尾巴朝天翘起，蹬了两下蹼才冒出来，甩出一圈晶亮的水珠。",
         "芦苇丛边的巢上，母鸭伏着一动不动，只有眼睛在慢慢眨。公鸭在附近的水面上慢慢游着。",
-        "野鸭站在岸边，扭过头用喙梳理翅膀下的羽毛，一根一根地理，阳光把它颈上的绿斑照得发亮。",
+        ("野鸭站在岸边，扭过头用喙梳理翅膀下的羽毛，一根一根地理，阳光把它颈上的绿斑照得发亮。", (), SUNLIGHT_WEATHERS),
         "两只野鸭同时拍打翅膀，在水面上踩出一串水花，然后收了翅，抖抖身子，重新浮在水上。",
     ],
     "翠鸟": [
-        "翠鸟蹲在枯枝上，缩着脖子，羽毛被逆光打出一圈蓝边。",
+        ("翠鸟蹲在枯枝上，缩着脖子，羽毛被逆光打出一圈蓝边。", (), DAYLIGHT_WEATHERS),
         "一道蓝影垂直扎入水面，碎光溅起。翠鸟叼着银亮的小鱼冲回枝头。",
         "翠鸟歪过头，用喙梳理胸前的羽毛，一下一下，不紧不慢。",
     ],
@@ -1265,8 +1282,8 @@ GAZE_SETTLER = {
 }
 
 GAZE_EMPTY = [
-    "池塘空着。天光落在水面，没有动静。",
-    "静水无生命，只有微尘在光柱里浮沉。",
+    ("池塘空着。天光落在水面，没有动静。", (), DAYLIGHT_WEATHERS),
+    ("静水无生命，只有微尘在光柱里浮沉。", (), DAYLIGHT_WEATHERS),
     "水如镜，深处沉默，还在等第一个住客。",
 ]
 
@@ -1282,10 +1299,10 @@ GAZE_HIBERNATE = [
 # ---------------------------------------------------------------------------
 
 OBSERVE_AMBIENT = {
-    # 每条文案可标注依赖物种 (text, [物种...])：依赖物种不在场时该条被过滤掉
-    # （见 _pick_ambient）；无依赖的写成纯字符串。
+    # 每条文案可写成 (text, [依赖物种...], 适用天气集合)；后两项可按需省略。
+    # 依赖物种不在场或当日天气不匹配时该条被过滤（见 _pick_ambient）。
     "high_cover": [
-        ("浮萍铺满了水面。光从几处缝隙漏下去，在水底投下细碎的光斑，其余都是暗的。", ["浮萍"]),
+        ("浮萍铺满了水面。光从几处缝隙漏下去，在水底投下细碎的光斑，其余都是暗的。", ["浮萍"], DAYLIGHT_WEATHERS),
         ("绿毯把水面封死了。看不见鱼，看不见底，浮萍在微风里轻轻挤着，发出细小的摩擦声。", ["浮萍"]),
         ("浮萍厚厚地压着，风也推不开。水底闷得发不出声，偶尔一串气泡从缝隙里钻上来，又碎了。", ["浮萍"]),
         ("浮萍密到连水都看不见了。偶尔有鱼顶了一下浮萍，绿毯鼓起一个小包，又慢慢平下去。", ["浮萍"]),
@@ -1324,7 +1341,7 @@ OBSERVE_AMBIENT = {
     "biodiverse": [
         "池塘从来没有这样挤过。从水底到水面，每一层都有生命在忙自己的事。",
         ("鱼群在水草间穿梭，田螺在石面上缓缓爬过，岸边草丛里窸窣作响。池塘活了。", ["田螺"]),
-        ("眼睛不知道该往哪里放。水蚤在光柱里跳动，远处野鸭划开水面，到处都有动静。", ["水蚤", "野鸭"]),
+        ("眼睛不知道该往哪里放。水蚤在光柱里跳动，远处野鸭划开水面，到处都有动静。", ["水蚤", "野鸭"], DAYLIGHT_WEATHERS),
         ("水黾在水面压出一圈圈细纹，鲫鱼在中间水层穿梭，田螺在水底慢慢犁过石头。池塘的每一层都有人值班。", ["水黾", "鲫鱼", "田螺"]),
         ("青蛙蹲在睡莲叶上叫了一声，蜻蜓从芦苇尖上弹出去，翠鸟在枯枝上偏了偏头。到处都有眼睛盯着水面，到处都有影子在被盯。", ["青蛙", "睡莲", "蜻蜓成虫", "芦苇", "翠鸟"]),
         ("食物链一刻不停地转着。水蚤啃水藻，鲫鱼追水蚤，鲤鱼在深处等它的那份。一环咬着另一环，谁也没闲着。", ["水蚤", "水藻", "鲫鱼", "鲤鱼"]),
@@ -1338,12 +1355,12 @@ OBSERVE_AMBIENT = {
         ("螃蟹在水底横着走，大钳子拖过泥沙，留下一道歪歪的痕。石缝外面堆着新挖出来的碎泥，一小堆一小堆。", ["螃蟹"]),
     ],
     "default": [
-        "水面平静，光线在水底缓缓移动。一切都按着自己的节奏，不快不慢。",
+        ("水面平静，光线在水底缓缓移动。一切都按着自己的节奏，不快不慢。", (), DAYLIGHT_WEATHERS),
         "池塘安静地呼吸着。没有大事发生，细小的生命在各自的角落里忙着。",
-        "天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地转着。",
-        ("池塘没有什么特别的事。水蚤在光柱里跳，田螺在石头上爬，一切和昨天差不多，大概明天也一样。", ["水蚤", "田螺"]),
+        ("天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地转着。", (), DAYLIGHT_WEATHERS),
+        ("池塘没有什么特别的事。水蚤在光柱里跳，田螺在石头上爬，一切和昨天差不多，大概明天也一样。", ["水蚤", "田螺"], DAYLIGHT_WEATHERS),
         "风轻轻推了一下水面，涟漪从东岸荡到西岸，碰到岸边又荡回来。鱼在水草间打了个转，又游回原来的位置。",
-        "天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地转着。今天没有大事发生，这就很好。",
+        ("天光落在水上，碎成一片细鳞。水底的世界不紧不慢，自顾自地转着。今天没有大事发生，这就很好。", (), DAYLIGHT_WEATHERS),
     ],
 }
 
@@ -1537,8 +1554,12 @@ YEAR_LEN = SEASON_LEN * 4
 
 SEASON_ENV = {
     # 目标基准值（tick 中向其缓动）
-    "春": {"water_temp": 18, "light": 0.85, "desc": "光斜斜照进来，水开始暖了。"},
-    "夏": {"water_temp": 28, "light": 1.0,  "desc": "日光白得晃眼，水面蒸起一层薄薄的热气。"},
+    "春": {"water_temp": 18, "light": 0.85, "desc": "光斜斜照进来，水开始暖了。",
+           "desc_pool": [("光斜斜照进来，水开始暖了。", (), SUNLIGHT_WEATHERS),
+                         "水开始暖了，岸边的嫩芽舒展开来。"]},
+    "夏": {"water_temp": 28, "light": 1.0,  "desc": "日光白得晃眼，水面蒸起一层薄薄的热气。",
+           "desc_pool": [("日光白得晃眼，水面蒸起一层薄薄的热气。", (), SUNLIGHT_WEATHERS),
+                         "水温升了，水面蒸起一层薄薄的热气。"]},
     "秋": {"water_temp": 16, "light": 0.7,  "desc": "一片黄叶落在水面上，光变软了。"},
     # 冬季基准压到 3℃（低于 4℃ 结冰阈值），使"结冰"成为冬季常态（item 五）
     "冬": {"water_temp": 3,  "light": 0.45, "desc": "寒气从水面蔓延到池底，冰凌在岸边聚拢。"},
@@ -2693,7 +2714,10 @@ SEASON_TEXT = {
     "蛙醒": "岸边的泥里传来窸窣，冬眠的青蛙揉了揉眼，重新跳回了水边。",
     "睡莲抽芽": "水底冒出几片卷着的嫩叶，慢慢撑开，铺在水面上。",
     "睡莲重生": "去年的睡莲从根茎里又长了出来，几片新叶浮上水面。",
-    "睡莲开花": "盛夏的午后，睡莲开出了今年第一朵白花，花瓣层层张开，迎着光。",
+    "睡莲开花": [
+        ("盛夏的午后，睡莲开出了今年第一朵白花，花瓣层层张开，迎着光。", (), SUNLIGHT_WEATHERS),
+        "睡莲开出了今年第一朵白花，花瓣层层张开，浮在圆叶之间。",
+    ],
     "芦苇枯黄": "芦苇穗子变黄了，在风里沙沙作响。",
     "结冰": "水面凝起一层薄冰，从岸边一直冻向池心，池塘的呼吸慢了下来。",
     "昆虫冻死": "一夜寒霜，水面上的蚊蚋和蜻蜓都不见了踪影，冻进了这个冬天。",
@@ -2711,7 +2735,7 @@ def _season_events(state, events, season, prev_season):
     if season == "春":
         if f.get("ice_on"):
             f["ice_on"] = False
-            events.append("weather:" + SEASON_TEXT["冰融"])
+            events.append("weather:" + _season_text(state, "冰融"))
         # 冬季玩法计数春季重置：凿冰次数 / 落叶床 / 延迟反馈待发标记
         f["crack_count"] = 0
         f["shelter_used"] = False
@@ -2728,23 +2752,23 @@ def _season_events(state, events, season, prev_season):
                 _folio_bump_disaster(state, "冬眠苏醒失败", "冬季低温折损青蛙")
                 _chronicle(state, DISASTER_TEXT["冬眠苏醒失败"]["chronicle"])
             pop["青蛙"] = pop.get("青蛙", 0.0) + waking
-            events.append("season:" + SEASON_TEXT["蛙醒"])
+            events.append("season:" + _season_text(state, "蛙醒"))
         # 睡莲抽芽 / 去年有过睡莲则自动恢复少量
         if pop.get("睡莲", 0) >= 1:
-            events.append("season:" + SEASON_TEXT["睡莲抽芽"])
+            events.append("season:" + _season_text(state, "睡莲抽芽"))
         elif f.get("had_lily"):
             pop["睡莲"] = 5.0
-            events.append("season:" + SEASON_TEXT["睡莲重生"])
+            events.append("season:" + _season_text(state, "睡莲重生"))
     elif season == "秋":
         if pop.get("芦苇", 0) >= 1:
-            events.append("season:" + SEASON_TEXT["芦苇枯黄"])
+            events.append("season:" + _season_text(state, "芦苇枯黄"))
     elif season == "冬":
         f["winter_low_temp_days"] = 0
         # 进入冬季：记录总生物量快照，供来年春季年终简报计算越冬存活率
         f["winter_biomass_start"] = _total_biomass(state)
         # 昆虫冻死归零
         if pop.get("蚊子", 0) >= 1 or pop.get("蜻蜓成虫", 0) >= 1:
-            events.append("season:" + SEASON_TEXT["昆虫冻死"])
+            events.append("season:" + _season_text(state, "昆虫冻死"))
         pop["蚊子"] = 0.0
         pop["蜻蜓成虫"] = 0.0
 
@@ -2775,7 +2799,7 @@ DISEASE_ONSET = {
     ],
     "水蚤": [
         "水蚤的颜色发暗了。它们不再是透明的，而是带着一层浑浊的灰。",
-        "光柱里的水蚤跳动得比平时慢。它们一顿一顿地浮沉，像是在水里挣扎。",
+        ("光柱里的水蚤跳动得比平时慢。它们一顿一顿地浮沉，像是在水里挣扎。", (), DAYLIGHT_WEATHERS),
         "几只水蚤沉在水底，细细的附肢还在动，但已经弹不起来了。",
         "成群的水蚤不再聚在光里。它们散开了，零零落落地漂着。",
     ],
@@ -2844,14 +2868,14 @@ DISEASE_ONSET_GENERIC = [
 DISEASE_SPREAD = [
     "水底多了几具小小的尸体。鲫鱼的白腹在暗色水面上格外显眼，一条、两条、三条。",
     "病不只是停留在一个物种身上了。隔壁的水层里，另一些影子也开始歪斜。",
-    "池塘安静了许多。那些平时在光柱里跳动的水蚤，现在稀稀落落，光柱空了大半。",
+    ("池塘安静了许多。那些平时在光柱里跳动的水蚤，现在稀稀落落，光柱空了大半。", (), DAYLIGHT_WEATHERS),
     "死亡从水底蔓延到水面。孑孓不再扭动，田螺从石头上脱落，水黾的长腿折叠着漂在水上。",
     "青蛙不叫了。鱼群不再穿梭。只有腐气从水底升上来，在水面碎成细密的气泡。",
 ]
 # 高峰期（第6天起）通用 5 套
 DISEASE_PEAK = [
     "水面漂着尸体。鲫鱼侧翻着，鳞片失去光泽，随波轻轻晃动。没有谁来清理它们。",
-    "曾经热闹的水层空了。光柱里没有跳动的影子，水草间没有穿梭的银光。池塘在沉默。",
+    ("曾经热闹的水层空了。光柱里没有跳动的影子，水草间没有穿梭的银光。池塘在沉默。", (), DAYLIGHT_WEATHERS),
     "只有最强壮的还在挣扎。一条鲤鱼缓慢地巡游，从尸体中间穿过，尾鳍搅起的浑雾里带着腐味。",
     "水底铺着一层白色的螺壳，有些空了，有些半张着。螃蟹缩在石缝里，再没有挥过钳子。",
     "疫病像是把池塘的呼吸掐住了。水面不起波澜，水底不生涟漪，一切都压在沉闷里。",
@@ -2869,7 +2893,7 @@ DISEASE_END = [
     "活下来的个体重新开始活动。一条鲫鱼慢慢游过浅水，鳞片上重新有了光。",
     "水质一天比一天清。尸体沉入淤泥，被分解者慢慢消化。池塘在自愈。",
     "安静了很久之后，第一声响动出现了。是一只青蛙，试探般地叫了一声。然后又是一声。",
-    "水蚤重新出现在光柱里，先是几只，然后是一小群。它们弹跳着，光柱又活了。",
+    ("水蚤重新出现在光柱里，先是几只，然后是一小群。它们弹跳着，光柱又活了。", (), DAYLIGHT_WEATHERS),
     "池塘长长地吐了一口气。水面荡开一圈圈涟漪，不是死水了，是在重新呼吸。",
 ]
 # chronicle 记录：开始 / 传染 / 结束 各 5 句
@@ -2938,15 +2962,15 @@ def _process_disease(state, events, r):
         if day <= 2:
             phase, mult = "onset", 1.0
             if name in DISEASE_ONSET:
-                txt = _pick(r, DISEASE_ONSET[name])
+                txt = _pick_weather(state, r, DISEASE_ONSET[name])
             else:
-                txt = _pick(r, DISEASE_ONSET_GENERIC) % name
+                txt = _pick_weather(state, r, DISEASE_ONSET_GENERIC) % name
         elif day <= 5:
             phase, mult = "spread", 2.0
-            txt = _pick(r, DISEASE_SPREAD)
+            txt = _pick_weather(state, r, DISEASE_SPREAD)
         else:
             phase, mult = "peak", 3.0
-            txt = _pick(r, DISEASE_PEAK)
+            txt = _pick_weather(state, r, DISEASE_PEAK)
         # 额外死亡（叠加在已结算的基础死亡之上）
         if mult > 1.0 and pop.get(name, 0) > 0:
             extra = pop[name] * sp["death_rate"] * (mult - 1.0)
@@ -2970,7 +2994,7 @@ def _process_disease(state, events, r):
         diseases.pop(name, None)
         immune[name] = turn + 30          # 结束后 30 天免疫
         _chronicle(state, _pick(r, DISEASE_CHRON_END))
-        events.append("disease:" + _pick(r, DISEASE_END))
+        events.append("disease:" + _pick_weather(state, r, DISEASE_END))
     for t in newly:
         diseases.setdefault(t, {"elapsed": 0, "duration": r.randint(7, 10)})
     # 触发新疫病：密度 > 80% 承载且非免疫，每天 3% 概率；一回合最多新发一种
@@ -3007,8 +3031,9 @@ def tick(state):
     # 当日天气（梅雨状态机 / 春寒 / 秋霜）——环境与物种修正都从这里读
     _roll_weather(state, r, season)
     if season != prev_season:
-        events.append("season:" + SEASON_ENV[season]["desc"])
-        _chronicle(state, "入%s，%s" % (season, SEASON_ENV[season]["desc"]))
+        desc = _season_desc(state, season)
+        events.append("season:" + desc)
+        _chronicle(state, "入%s，%s" % (season, desc))
     # 季节切换的自动事件（融冰/抽芽/枯黄/昆虫冻死等）
     _season_events(state, events, season, prev_season)
 
@@ -3029,7 +3054,7 @@ def tick(state):
     if season == "冬" and env["water_temp"] < 4.0:
         if not state["flags"].get("ice_on"):
             state["flags"]["ice_on"] = True
-            events.append("weather:" + SEASON_TEXT["结冰"])
+            events.append("weather:" + _season_text(state, "结冰"))
     ice = state["flags"].get("ice_on", False)
     # 水面覆盖率（浮萍 + 睡莲）影响光照
     duckweed_cover = _surface_cover(state)
@@ -3506,9 +3531,10 @@ PAIR_SETTLE_TEXT = {
         "两条水蛇在这片芦苇丛里安了家。它们有时候盘在同一丛苇根下，有时候分开巡视池塘的两端。温暖的日子里，芦苇深处的枯茎根部也许会多出几枚微微发亮的软壳卵。",
     ],
     "流浪乌龟": [
-        "你让它们留了下来。两只乌龟开始在浅水和岸边一起出现，慢慢爬过水底，一起晒太阳。春夏温暖的时候，岸边的沙地上或许会出现一个小小的坑。",
-        "两只乌龟一起留下了。晴天的时候，石头上趴着两颗壳，一大一小，都伸着脖子晒太阳。温暖季节里，如果它们爬上沙岸，可能会在那里留下一个刨过的坑。",
-        "池塘里有了两只乌龟。它们在水底一前一后地爬，啃同一片水藻，晒同一块石头。春末夏初，岸边沙地上多了一些拖过的痕迹和浅浅的坑——乌龟在这里埋下了以后的事。",
+        ("你让它们留了下来。两只乌龟开始在浅水和岸边一起出现，慢慢爬过水底，一起晒太阳。春夏温暖的时候，岸边的沙地上或许会出现一个小小的坑。", (), SUNLIGHT_WEATHERS),
+        ("两只乌龟一起留下了。晴天的时候，石头上趴着两颗壳，一大一小，都伸着脖子晒太阳。温暖季节里，如果它们爬上沙岸，可能会在那里留下一个刨过的坑。", (), SUNLIGHT_WEATHERS),
+        ("池塘里有了两只乌龟。它们在水底一前一后地爬，啃同一片水藻，晒同一块石头。春末夏初，岸边沙地上多了一些拖过的痕迹和浅浅的坑——乌龟在这里埋下了以后的事。", (), SUNLIGHT_WEATHERS),
+        "两只乌龟一起留了下来。它们一前一后爬过浅水，在同一块石头旁停住。春夏温暖的时候，岸边的沙地上或许会出现一个小小的坑。",
     ],
     "螃蟹": [
         "你留下了这只新螃蟹。两只螃蟹分据石缝两头，偶尔在水底相遇，碰一碰钳子又各自走开。池底的石缝间，以后或许能看到更小的钳子探出来。",
@@ -4106,9 +4132,9 @@ SETTLER_INTERACTIONS = {
         "水蛇盘在浅水处的石头上。翠鸟换了一根更远的枯枝。那道蓝影离水面又高了一截。",
     ],
     frozenset({"翠鸟", "流浪乌龟"}): [
-        "乌龟趴在水面浮木上，脖子伸得老长，晒太阳。翠鸟落在浮木另一端，压得木头微微翘了一下。",
+        ("乌龟趴在水面浮木上，脖子伸得老长，晒太阳。翠鸟落在浮木另一端，压得木头微微翘了一下。", (), SUNLIGHT_WEATHERS),
         "翠鸟扎水，溅了乌龟一脸。乌龟缩了一下脖子，又慢慢伸出来。眼睛半闭着。",
-        "枯枝上的蓝影和浮木上的灰壳子，隔着半片池塘，一起在午后的光里不动。一个等鱼，一个不等。",
+        ("枯枝上的蓝影和浮木上的灰壳子，隔着半片池塘，一起在午后的光里不动。一个等鱼，一个不等。", (), SUNLIGHT_WEATHERS),
     ],
     frozenset({"翠鸟", "螃蟹"}): [
         "螃蟹在岸边翻石头，螯子举着碎螺壳。翠鸟低头看了它一眼，没兴趣。",
@@ -4136,7 +4162,7 @@ SETTLER_INTERACTIONS = {
         "浅水处，苍鹭的腿立得像两根枯枝。水蛇绕着其中一根游了一圈，滑进芦苇丛。",
     ],
     frozenset({"苍鹭", "流浪乌龟"}): [
-        "乌龟在岸边石头上晒壳。苍鹭从它旁边走过，脚步极慢，没踩到它。",
+        ("乌龟在岸边石头上晒壳。苍鹭从它旁边走过，脚步极慢，没踩到它。", (), SUNLIGHT_WEATHERS),
         "苍鹭叼着一条鲫鱼，仰头吞下去。旁边的乌龟把头转向它，嘴张开又合上。",
         "浮木上趴着乌龟。苍鹭落在浮木另一头，木头吃水更深了。两个都不动。午后很长。",
     ],
@@ -4161,7 +4187,7 @@ SETTLER_INTERACTIONS = {
     ],
     frozenset({"水蛇", "流浪乌龟"}): [
         "水蛇从乌龟壳上滑过去。乌龟的头缩了一下，又伸出来，眼睛跟着那道波纹走。",
-        "乌龟趴浮木上，水蛇盘在浮木边沿的水里。半个身子搭在木头上。一起晒太阳。",
+        ("乌龟趴浮木上，水蛇盘在浮木边沿的水里。半个身子搭在木头上。一起晒太阳。", (), SUNLIGHT_WEATHERS),
         "水蛇钻进乌龟趴着的那块石头底下。乌龟没动，眼睛半闭。石头底下的事情不重要。",
     ],
     frozenset({"水蛇", "螃蟹"}): [
@@ -4191,12 +4217,12 @@ SETTLER_INTERACTIONS = {
     ],
     frozenset({"流浪乌龟", "野鸭"}): [
         "野鸭划水经过浮木，乌龟把头缩进壳里。野鸭看了它一眼，继续划。",
-        "乌龟在岸边晒壳，野鸭群扑啦啦落水。乌龟睁开一只眼，又闭上。",
+        ("乌龟在岸边晒壳，野鸭群扑啦啦落水。乌龟睁开一只眼，又闭上。", (), SUNLIGHT_WEATHERS),
         "野鸭在浅水处翻东西吃，喙碰到一个硬壳。乌龟的头慢慢伸出来，野鸭退了一步。都没叫。",
     ],
     frozenset({"流浪乌龟", "青蛙"}): [
         "青蛙蹲在乌龟壳上叫。乌龟伸长脖子，头转向背后。青蛙跳走了。",
-        "乌龟在浮木上趴着，旁边睡莲叶上蹲了只青蛙。两个都在晒太阳。木头和叶子轻轻碰了一下。",
+        ("乌龟在浮木上趴着，旁边睡莲叶上蹲了只青蛙。两个都在晒太阳。木头和叶子轻轻碰了一下。", (), SUNLIGHT_WEATHERS),
         "浅水处，乌龟和青蛙面对面停着。青蛙眨了一下眼睛，乌龟没眨眼。青蛙跳走了。",
     ],
     frozenset({"流浪乌龟", "田螺"}): [
@@ -4261,16 +4287,63 @@ def _settler_interactions(state, events, r):
     if not pool:
         return
     key = pool[r.randint(0, len(pool) - 1)]
-    events.append("settler_interact:" + _pick(r, SETTLER_INTERACTIONS[key]))
+    text = _pick_weather(state, r, SETTLER_INTERACTIONS[key])
+    if text:
+        events.append("settler_interact:" + text)
 
 
 def _pick(r, arr):
     return arr[r.randint(0, len(arr) - 1)]
 
 
+def _text_parts(item):
+    """拆解文案项：(text, deps, weathers)，兼容原有 str / (text, deps)。"""
+    if not isinstance(item, tuple):
+        return item, (), None
+    text = item[0]
+    deps = item[1] if len(item) >= 2 else ()
+    weathers = item[2] if len(item) >= 3 else None
+    return text, deps, weathers
+
+
+def _text_value(item):
+    """取得文案正文，不执行任何筛选。"""
+    return _text_parts(item)[0]
+
+
+def _weather_texts(state, arr):
+    """按天气过滤文案并返回正文列表；纯确定性，不消耗 PRNG。"""
+    weather = _weather(state)
+    return [text for text, _deps, weathers in map(_text_parts, arr)
+            if weathers is None or weather in weathers]
+
+
 def _pick_t(state, arr):
-    """按回合数确定性取一条文案（不消耗 PRNG，保持随机流对齐）。"""
-    return arr[state["turn"] % len(arr)]
+    """按天气过滤后随回合确定性取文案（不消耗 PRNG，保持随机流对齐）。"""
+    avail = _weather_texts(state, arr)
+    if not avail:
+        return None
+    return avail[state["turn"] % len(avail)]
+
+
+def _pick_weather(state, r, arr):
+    """按天气过滤后随机取一条；始终至多消耗一次 PRNG。"""
+    avail = _weather_texts(state, arr)
+    if not avail:
+        return None
+    return avail[r.randint(0, len(avail) - 1)]
+
+
+def _season_desc(state, season):
+    """取得与当日天气相容的入季描写。"""
+    spec = SEASON_ENV[season]
+    return _pick_t(state, spec.get("desc_pool", [spec["desc"]]))
+
+
+def _season_text(state, key):
+    """取得季节事件文案；兼容原有单字符串和带天气依赖的文案池。"""
+    value = SEASON_TEXT[key]
+    return _pick_t(state, value) if isinstance(value, list) else value
 
 
 def _ambient_present(state, name):
@@ -4279,18 +4352,17 @@ def _ambient_present(state, name):
 
 
 def _pick_ambient(state, arr):
-    """从带物种依赖标注的 observe 文案池里确定性取一条。
+    """从带物种/天气依赖标注的 observe 文案池里确定性取一条。
 
-    arr 中每项为 str（无依赖）或 (str, [依赖物种...])。过滤掉依赖物种当前
-    不存在的文案，避免描写并不存在的生物。全被过滤则返回 None（调用方降级）。
+    arr 中每项为 str，或 (str, [依赖物种...], 适用天气集合)，后两项可省略。
+    过滤掉依赖物种不存在或当日天气不匹配的文案。全被过滤则返回 None，
+    由调用方沿用现有逻辑降级。
     """
     avail = []
     for item in arr:
-        if isinstance(item, tuple):
-            text, deps = item
-        else:
-            text, deps = item, ()
-        if all(_ambient_present(state, s) for s in deps):
+        text, deps, weathers = _text_parts(item)
+        if (weathers is None or _weather(state) in weathers) \
+                and all(_ambient_present(state, s) for s in deps):
             avail.append(text)
     if not avail:
         return None
@@ -4502,8 +4574,7 @@ def _process_settlers(state, events, r):
                               "吐了吐信子，慢慢滑向水面。")
                 _chronicle(state, "水蛇结束冬眠，重新出没在池塘。")
             else:
-                events.append("settler:乌龟从淤泥里探出头来，壳上还沾着泥。"
-                              "它慢吞吞爬向有阳光的浅水，冬眠结束了。")
+                events.append("settler:" + _pick_t(state, TURTLE_WAKE_TEXT))
                 _chronicle(state, "乌龟结束冬眠，重新回到池塘。")
         # 幼体成长：到期转为独立定居者
         if s.get("juvenile"):
@@ -4515,8 +4586,8 @@ def _process_settlers(state, events, r):
                     pool = grown
                     # 翠鸟幼体"叼着鲫鱼"文案需池塘有鱼，否则改用其他成长文案（补#6）
                     if name == "翠鸟" and state["populations"].get("鲫鱼", 0) < 1:
-                        pool = [t for t in grown if "鲫鱼" not in t] or grown
-                    events.append("settler_grown:" + _pick(r, pool))
+                        pool = [t for t in grown if "鲫鱼" not in _text_value(t)] or grown
+                    events.append("settler_grown:" + _pick_weather(state, r, pool))
                 _chronicle(state, SETTLER_GROWN_CHRON % name)
         # 摄食
         if s.get("juvenile"):
@@ -5085,7 +5156,7 @@ def _random_events(state, events, r, season):
 
     # 传说级访客 ~0.1%/天
     if vis(0.001):
-        events.append("legend:满月之夜，无数萤火从草丛升起，水面落满流动的光。")
+        events.append("legend:" + _pick_t(state, FIREFLY_LEGEND_TEXT))
         _folio_bump(state, "events", "萤火虫大爆发", "纯观赏奇景")
         _chain_set(state, "bat_x3", 1)  # 连锁：次日蝙蝠出现概率 ×3
         _unlock(state, events, "萤光之夜")
@@ -5109,7 +5180,7 @@ def _random_events(state, events, r, season):
         year = state["turn"] // YEAR_LEN
         if state["flags"].get("lily_bloom_year") != year:
             state["flags"]["lily_bloom_year"] = year
-            events.append("season:" + SEASON_TEXT["睡莲开花"])
+            events.append("season:" + _season_text(state, "睡莲开花"))
             _unlock(state, events, "睡莲花开")
 
     # 环境灾害 —— 受季节影响（已有进行中的灾害时不叠新灾害）
@@ -5792,13 +5863,15 @@ def _classify_event(ev):
     if tag == "season":
         name = "时序流转"
         for s, v in SEASON_ENV.items():
-            if v["desc"] == body:
+            descs = v.get("desc_pool", [v["desc"]])
+            if any(_text_value(item) == body for item in descs):
                 name = "入" + s
                 break
         else:
             # 季节性自动事件文案（蛙醒/睡莲抽芽/芦苇枯黄/睡莲开花等）
             for k, txt in SEASON_TEXT.items():
-                if txt == body:
+                choices = txt if isinstance(txt, list) else [txt]
+                if any(_text_value(item) == body for item in choices):
                     name = k
                     break
         meta["name"] = name
@@ -5976,7 +6049,7 @@ def _observe_ambient(state):
         # 依赖物种不在场的文案会被过滤；全被过滤时降级到 default
         environ = (_pick_ambient(state, OBSERVE_AMBIENT[cat])
                    or _pick_ambient(state, OBSERVE_AMBIENT["default"])
-                   or OBSERVE_AMBIENT["default"][0])
+                   or _text_value(OBSERVE_AMBIENT["default"][1]))
     if state.get("settlers"):
         # 定居者段只输出当前实际在场的定居者对应文案
         settler_txt = _pick_ambient(state, OBSERVE_AMBIENT["settler"])
@@ -6569,7 +6642,7 @@ def _cmd_crack(state, args):
     env["detritus"] -= 5
     f["crack_count"] = f.get("crack_count", 0) + 1
     _chain_set(state, "ice_hole", 3)
-    lines = ["🧊 " + _gaze_pick(r, CRACK_ACTION["op"])]
+    lines = ["🧊 " + _gaze_pick(state, r, CRACK_ACTION["op"])]
     if f["crack_count"] >= 3:
         env["water_temp"] = _clamp(env["water_temp"] - 0.5, 0.0, 42.0)
     # 延迟反馈：2~3 天后在 observe/gaze 末尾追加一句一次性描写
@@ -6601,7 +6674,7 @@ def _cmd_shelter(state, args):
     # chain 持续到本冬季结束（冬季内剩余天数）
     days_left = SEASON_LEN - (state["turn"] % SEASON_LEN)
     _chain_set(state, "shelter", max(1, days_left))
-    lines = ["🍂 " + _gaze_pick(r, SHELTER_ACTION["op"])]
+    lines = ["🍂 " + _gaze_pick(state, r, SHELTER_ACTION["op"])]
     # 延迟反馈：4~5 天后在 observe/gaze 末尾追加一句一次性描写
     f["shelter_hint_due"] = state["turn"] + r.randint(4, 5)
     f["shelter_hint_idx"] = r.randint(0, len(SHELTER_ACTION["hint"]) - 1)
@@ -7157,8 +7230,12 @@ def api_species(state, name):
     }
 
 
-def _gaze_pick(r, options):
-    return options[r.randint(0, len(options) - 1)]
+def _gaze_pick(state, r, options):
+    """按天气过滤后随机取一条；候选池变化不增加或重试随机调用。"""
+    avail = _weather_texts(state, options)
+    if not avail:
+        return None
+    return avail[r.randint(0, len(avail) - 1)]
 
 
 def _gaze_sample(r, seq, k):
@@ -7179,55 +7256,57 @@ def _cmd_gaze(state):
     pop = state["populations"]
     env = state["env"]
     season = state["season"]
-    lines = [_gaze_pick(r, GAZE_SEASON[season])]
+    lines = [_gaze_pick(state, r, GAZE_SEASON[season])]
 
     # 环境氛围：按最显著的一种状态选一句
     cover = _surface_cover(state)
     if env["dissolved_oxygen"] < 4.0:
-        lines.append(_gaze_pick(r, GAZE_ENV["low_do"]))
+        lines.append(_gaze_pick(state, r, GAZE_ENV["low_do"]))
     elif cover > 0.7:
-        lines.append(_gaze_pick(r, GAZE_ENV["cover"]))
+        lines.append(_gaze_pick(state, r, GAZE_ENV["cover"]))
     elif env["turbidity"] > 0.4:
-        lines.append(_gaze_pick(r, GAZE_ENV["turbid"]))
+        lines.append(_gaze_pick(state, r, GAZE_ENV["turbid"]))
     elif env["turbidity"] < 0.1 and env["dissolved_oxygen"] >= 6.0:
-        lines.append(_gaze_pick(r, GAZE_ENV["clear"]))
+        lines.append(_gaze_pick(state, r, GAZE_ENV["clear"]))
 
     # 主体：在场物种里随机挑 2~3 个来描写
     # 苍鹭来访后两天，鲫鱼/鲤鱼优先抽"躲藏"变体
     hide = _chain_active(state, "heron_hide")
     present = [n for n in GAZE_SUBJECT_ORDER if pop.get(n, 0) >= 1]
     if not present:
-        lines.append(_gaze_pick(r, GAZE_EMPTY))
+        lines.append(_gaze_pick(state, r, GAZE_EMPTY))
     else:
         k = min(len(present), r.randint(2, 3))
         for n in _gaze_sample(r, present, k):
             if hide and n in GAZE_FISH_HIDE:
-                lines.append(_gaze_pick(r, GAZE_FISH_HIDE[n]))
+                lines.append(_gaze_pick(state, r, GAZE_FISH_HIDE[n]))
             else:
-                lines.append(_gaze_pick(r, GAZE_SUBJECT[n]))
+                lines.append(_gaze_pick(state, r, GAZE_SUBJECT[n]))
 
     # 冬季：青蛙在冬眠，不描写活动，只点出泥底下的越冬者
     if season == "冬" and state.get("hibernate", {}).get("青蛙", 0) > 0:
-        lines.append(_gaze_pick(r, GAZE_HIBERNATE))
+        lines.append(_gaze_pick(state, r, GAZE_HIBERNATE))
     # 冬季视角下沉：冰封时追加一句冰下微观描写
     if season == "冬" and state["flags"].get("ice_on"):
-        lines.append(_gaze_pick(r, GAZE_WINTER_DEEP))
+        lines.append(_gaze_pick(state, r, GAZE_WINTER_DEEP))
 
     # 定居者也要入画（最近 3 条不重复，item 8）
     for s in state.get("settlers", []):
         tmpl = GAZE_SETTLER.get(s["name"])
         if tmpl:
-            allowed = list(range(len(tmpl)))
+            allowed = [i for i, item in enumerate(tmpl)
+                       if _text_parts(item)[2] is None
+                       or _weather(state) in _text_parts(item)[2]]
             # 翠鸟"叼着小鱼"文案需池塘里有鱼才出现，否则降级到其他翠鸟文案（二轮#1）
             if s["name"] == "翠鸟" and pop.get("鲫鱼", 0) <= 0:
-                allowed = [i for i in allowed if "小鱼" not in tmpl[i]] or allowed
+                allowed = [i for i in allowed if "小鱼" not in _text_value(tmpl[i])] or allowed
             recent = s.setdefault("recent_gaze", [])
             choices = [i for i in allowed if i not in recent] or allowed
             idx = choices[r.randint(0, len(choices) - 1)]
             recent.append(idx)
             if len(recent) > 3:
                 recent.pop(0)
-            lines.append(tmpl[idx])
+            lines.append(_text_value(tmpl[idx]))
 
     # 冬季玩法延迟反馈（凿冰洞 / 落叶床，一次性，同样在 gaze 里体现）
     lines.extend(_winter_action_hints(state))
