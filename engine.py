@@ -2155,6 +2155,25 @@ ACHIEVEMENTS = {
     "破罐破摔": "塘臭了，你还每天来看。",
 }
 
+# 专属成就名 -> 所属 player_id。所属玩家或已解锁该成就的存档才可见。
+EXCLUSIVE_ACHIEVEMENTS = {
+    "🍊特供 · 蛇我而去": "783",
+}
+
+
+def _visible_achievements(state):
+    """返回当前存档可见的成就条目，供文本图鉴与 API 共用。"""
+    unlocked = set(state.get("achievements", []))
+    player_id = state.get("player_id")
+    player_id = str(player_id) if player_id is not None else None
+    return [
+        (name, condition)
+        for name, condition in ACHIEVEMENTS.items()
+        if name not in EXCLUSIVE_ACHIEVEMENTS
+        or EXCLUSIVE_ACHIEVEMENTS[name] == player_id
+        or name in unlocked
+    ]
+
 # 定居者物种 -> 专属"离开累计3次"成就名
 SETTLER_LEAVE_ACHIEVEMENTS = {
     "水蛇": "蛇去楼空",
@@ -2226,6 +2245,13 @@ def fresh_state(seed):
             "water_hyacinth": None,      # {"day": 触发天, "cover": 当前覆盖}
             "hibernation_crisis": False,
             "winter_low_temp_days": 0,
+            # 人类前端协作（human_action）：人机独立累计、互不阻塞
+            "ai_expel_count": 0,         # 小机驱赶巴西龟累计次数（同一只，回访不清零）
+            "human_expel_count": 0,      # 人类驱赶巴西龟累计次数（合计 ≥2 才彻底赶走）
+            "human_snail_catch_count": 0,  # 人类捞福寿螺累计次数
+            "human_crack_count": 0,      # 本冬人类凿冰次数（计入 crack_count 共享上限，春季重置）
+            "ice_suffocation": 0,        # 冰窒息值：结冰期每天 +1 累积，冰融清零
+            "ice_suff_pause_day": -1,    # 该天不涨冰窒息值（凿冰成功后的次日生效）
         },
         "log": [],                   # 最近一回合的事件列表
         "pending_pause": None,       # wait 自动暂停原因
@@ -2311,6 +2337,11 @@ def _migrate(state):
         state["env"].setdefault(k, v)
     for k, v in base["flags"].items():
         state["flags"].setdefault(k, v)
+    # 巴西龟驱赶改累计器：旧档 expelled_once 视为小机已累计 1 次
+    if state["flags"].get("brazilian_turtle") == "expelled_once" \
+            and not state["flags"].get("ai_expel_count") \
+            and not state["flags"].get("human_expel_count"):
+        state["flags"]["ai_expel_count"] = 1
     for name in base["cohorts"]:
         state["cohorts"].setdefault(name, [])
     # v4 新增字段：旧存档兼容
@@ -2700,6 +2731,18 @@ DISASTER_TEXT = {
 }
 
 
+# 灾害事件文本的人类协作提示：只追加提示文案，不改任何判定。
+# 小机看到这句提示可以决定要不要喊人类在前端帮忙（human_action）。
+HUMAN_HELP_HINT = {
+    "巴西龟入侵": "（人类可在前端帮忙驱赶巴西龟）",
+    "福寿螺入侵": "（人类可在前端帮忙捞螺）",
+    "水葫芦飘入": "（人类可在前端帮忙拔水葫芦）",
+    "绿潮": "（人类可在前端帮忙捞藻）",
+    "鼠患": "（人类可在前端帮忙打田鼠）",
+    "结冰": "（人类可在前端帮忙凿冰）",
+}
+
+
 def _folio_bump_disaster(state, key, note=None):
     d = state["folio"].setdefault("disasters", {}).setdefault(
         key, {"count": 0, "first_day": state["turn"], "days": [], "notes": []})
@@ -2826,9 +2869,15 @@ def _process_weather(state, events):
 
 
 def _trigger_brazilian_turtle(state, events):
-    state["flags"]["brazilian_turtle"] = "active"
+    f = state["flags"]
+    # 新的一只才清零驱赶累计；被赶走后回访的同一只保留人机各自的累计次数
+    if f.get("brazilian_turtle") != "expelled_once":
+        f["ai_expel_count"] = 0
+        f["human_expel_count"] = 0
+    f["brazilian_turtle"] = "active"
     _mark_counted_disaster(state, "巴西龟入侵", "外来龟常驻")
-    events.append("choice:" + _pick_t(state, DISASTER_TEXT["巴西龟入侵"]["start"]))
+    events.append("choice:" + _pick_t(state, DISASTER_TEXT["巴西龟入侵"]["start"])
+                  + HUMAN_HELP_HINT["巴西龟入侵"])
     state["pending_choice"] = {
         "event": "巴西龟入侵",
         "desc": _pick_t(state, DISASTER_TEXT["巴西龟入侵"]["start"]),
@@ -2840,7 +2889,8 @@ def _trigger_brazilian_turtle(state, events):
 def _trigger_apple_snail(state, events):
     state["flags"]["apple_snail"] = "active"
     _mark_counted_disaster(state, "福寿螺入侵", "外来螺常驻")
-    events.append("choice:" + _pick_t(state, DISASTER_TEXT["福寿螺入侵"]["start"]))
+    events.append("choice:" + _pick_t(state, DISASTER_TEXT["福寿螺入侵"]["start"])
+                  + HUMAN_HELP_HINT["福寿螺入侵"])
     state["pending_choice"] = {
         "event": "福寿螺入侵",
         "desc": _pick_t(state, DISASTER_TEXT["福寿螺入侵"]["start"]),
@@ -2877,7 +2927,8 @@ def _process_invasions(state, events):
             events.append("disaster:" + _pick_t(state, DISASTER_TEXT["水葫芦飘入"]["hidden"]))
         elif age == 3:
             if not state.get("pending_choice"):
-                events.append("choice:" + _pick_t(state, DISASTER_TEXT["水葫芦飘入"]["start"]))
+                events.append("choice:" + _pick_t(state, DISASTER_TEXT["水葫芦飘入"]["start"])
+                              + HUMAN_HELP_HINT["水葫芦飘入"])
                 state["pending_choice"] = {
                     "event": "水葫芦飘入",
                     "desc": _pick_t(state, DISASTER_TEXT["水葫芦飘入"]["start"]),
@@ -2913,15 +2964,19 @@ def _process_biological_disasters(state, events, r):
     green = bio.get("绿潮")
     if green:
         green["remaining"] -= 1
-        env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - 0.8)
+        # 人类前一天捞藻未达标时的当日减压（human_action skim_algae）：少扣一半溶氧
+        drain = 0.4 if green.get("do_relief_day") == state["turn"] else 0.8
+        env["dissolved_oxygen"] = max(0.0, env["dissolved_oxygen"] - drain)
         events.append("disaster:" + _pick(r, DISASTER_TEXT["绿潮"]["daily"]))
         if green["remaining"] <= 0:
             bio.pop("绿潮", None)
     elif pop.get("水藻", 0) > 500 and env["nutrients"] > 150:
+        # 基础持续 3-5 天；人类捞藻达标可逐日缩短（human_action skim_algae）
         bio["绿潮"] = {"remaining": r.randint(3, 5)}
         _folio_bump_disaster(state, "绿潮", "水藻过盛，水底缺氧")
         _chronicle(state, DISASTER_TEXT["绿潮"]["chronicle"])
-        events.append("disaster:" + _pick(r, DISASTER_TEXT["绿潮"]["start"]))
+        events.append("disaster:" + _pick(r, DISASTER_TEXT["绿潮"]["start"])
+                      + HUMAN_HELP_HINT["绿潮"])
 
     rat = bio.get("鼠患")
     if rat:
@@ -2939,7 +2994,8 @@ def _process_biological_disasters(state, events, r):
         bio["鼠患"] = {"remaining": 3}
         _folio_bump_disaster(state, "鼠患", "田鼠过多")
         _chronicle(state, DISASTER_TEXT["鼠患"]["chronicle"])
-        events.append("disaster:" + _pick(r, DISASTER_TEXT["鼠患"]["start"]))
+        events.append("disaster:" + _pick(r, DISASTER_TEXT["鼠患"]["start"])
+                      + HUMAN_HELP_HINT["鼠患"])
 
 
 # ---------------------------------------------------------------------------
@@ -3205,8 +3261,11 @@ def _season_events(state, events, season, prev_season):
         if f.get("ice_on"):
             f["ice_on"] = False
             events.append("weather:" + _season_text(state, "冰融"))
-        # 冬季玩法计数春季重置：凿冰次数 / 落叶床 / 延迟反馈待发标记
+        # 冬季玩法计数春季重置：凿冰次数 / 落叶床 / 延迟反馈待发标记 / 冰窒息值
         f["crack_count"] = 0
+        f["human_crack_count"] = 0
+        f["ice_suffocation"] = 0
+        f["ice_suff_pause_day"] = -1
         f["shelter_used"] = False
         f["crack_hint_pending"] = False
         f["shelter_hint_pending"] = False
@@ -3523,7 +3582,7 @@ def tick(state):
     if season == "冬" and env["water_temp"] < 4.0:
         if not state["flags"].get("ice_on"):
             state["flags"]["ice_on"] = True
-            events.append("weather:" + _season_text(state, "结冰"))
+            events.append("weather:" + _season_text(state, "结冰") + HUMAN_HELP_HINT["结冰"])
     ice = state["flags"].get("ice_on", False)
     # 水面覆盖率（浮萍 + 睡莲）影响光照
     duckweed_cover = _surface_cover(state)
@@ -3550,6 +3609,9 @@ def tick(state):
     # 结冰阻断气体交换：溶氧每天额外 -0.5（与浮萍覆盖叠加，item 五）
     if ice:
         env["dissolved_oxygen"] -= 0.5
+        # 冰窒息值逐日累积；凿冰成功（人机皆可）的次日不涨（human_action crack_ice）
+        if state["flags"].get("ice_suff_pause_day") != turn:
+            state["flags"]["ice_suffocation"] = state["flags"].get("ice_suffocation", 0) + 1
     # 凿冰洞（crack）：洞口气体交换恢复，持续 3 天每天溶氧额外 +0.3
     if _chain_active(state, "ice_hole"):
         env["dissolved_oxygen"] += 0.3
@@ -5500,6 +5562,30 @@ def _trigger_choice(state, events, key, desc_override=None, visit_folio_key=None
     return True
 
 
+def _expel_turtle_effect(state, events, side):
+    """驱赶巴西龟（人机共用）：各自累计一次，合计 ≥2 才彻底赶走。
+
+    合计 1 次：龟暂时离开（expelled_once），1-3 天后回访；
+    合计 2 次：彻底离开（gone），解锁「驱逐者」。
+    结果文案与回访延迟均为确定性取值，不消耗 PRNG。
+    """
+    f = state["flags"]
+    key = "human_expel_count" if side == "human" else "ai_expel_count"
+    f[key] = f.get(key, 0) + 1
+    total = f.get("ai_expel_count", 0) + f.get("human_expel_count", 0)
+    if total >= 2:
+        f["brazilian_turtle"] = "gone"
+        _unlock(state, events, "驱逐者")
+        msg = _pick_t(state, DISASTER_TEXT["巴西龟入侵"]["gone"])
+        _chronicle(state, DISASTER_TEXT["巴西龟入侵"]["chronicle"])
+    else:
+        f["brazilian_turtle"] = "expelled_once"
+        delay = 1 + (state["turn"] % 3)
+        f["brazilian_turtle_return_day"] = state["turn"] + delay
+        msg = _pick_t(state, DISASTER_TEXT["巴西龟入侵"]["fail"])
+    return msg
+
+
 def _resolve_choice(state, pc, idx, events):
     """应用决策结果（idx 为 1-based），返回结果文案。
 
@@ -5663,16 +5749,8 @@ def _resolve_choice(state, pc, idx, events):
             msg = "你扬起手，苍鹭展开宽大的翅膀退后两步，看了你一眼，最终放弃了枯枝，飞远了。"
     elif key == "巴西龟入侵":
         if idx == 1:
-            if state["flags"].get("brazilian_turtle") == "expelled_once":
-                state["flags"]["brazilian_turtle"] = "gone"
-                _unlock(state, events, "驱逐者")
-                msg = _pick_t(state, DISASTER_TEXT["巴西龟入侵"]["gone"])
-                _chronicle(state, DISASTER_TEXT["巴西龟入侵"]["chronicle"])
-            else:
-                state["flags"]["brazilian_turtle"] = "expelled_once"
-                delay = 1 + (state["turn"] % 3)
-                state["flags"]["brazilian_turtle_return_day"] = state["turn"] + delay
-                msg = _pick_t(state, DISASTER_TEXT["巴西龟入侵"]["fail"])
+            # 人机独立累计、合计 ≥2 才赶走（等价于原"赶一次 expelled_once、再赶一次 gone"）
+            msg = _expel_turtle_effect(state, events, "ai")
         else:
             msg = "你没有动手。那只龟继续伏在石头上，等水面安静下来。"
     elif key == "福寿螺入侵":
@@ -7414,6 +7492,7 @@ def _cmd_crack(state, args):
     env["detritus"] -= 5
     f["crack_count"] = f.get("crack_count", 0) + 1
     _chain_set(state, "ice_hole", 3)
+    f["ice_suff_pause_day"] = state["turn"] + 1  # 凿冰成功：次日冰窒息值不涨
     lines = ["🧊 " + _gaze_pick(state, r, CRACK_ACTION["op"])]
     if f["crack_count"] >= 3:
         env["water_temp"] = _clamp(env["water_temp"] - 0.5, 0.0, 42.0)
@@ -7594,8 +7673,10 @@ def _cmd_encyclopedia(state):
     # 访客图鉴段落：插在物种图鉴和成就之间
     lines.extend(_visitor_codex_lines(state))
     lines.append("")
-    lines.append("🏆 成就（%d/%d）：" % (len(state["achievements"]), len(ACHIEVEMENTS)))
-    for name, cond in ACHIEVEMENTS.items():
+    achievements = _visible_achievements(state)
+    unlocked_count = sum(name in state["achievements"] for name, _cond in achievements)
+    lines.append("🏆 成就（%d/%d）：" % (unlocked_count, len(achievements)))
+    for name, cond in achievements:
         mark = "✅" if name in state["achievements"] else "🔒"
         lines.append("  %s %s —— %s" % (mark, name, cond))
     return "\n".join(lines)
@@ -7905,6 +7986,7 @@ def api_codex(state):
     if hint_pool:
         r = Mulberry32(state["turn"])
         hints = _gaze_sample(r, hint_pool, 3)
+    achievements = _visible_achievements(state)
     return {
         "species_count": {"appeared": len(appeared), "total": len(RESIDENT_SPECIES)},
         "species": species,
@@ -7920,7 +8002,7 @@ def api_codex(state):
                 "unlocked": name in state.get("achievements", []),
                 "condition": condition,
             }
-            for name, condition in ACHIEVEMENTS.items()
+            for name, condition in achievements
         ],
     }
 
@@ -8033,6 +8115,247 @@ def api_species(state, name):
         "lifecycle": lifecycle,
         "current_count": _ipop(state, resolved),
     }
+
+
+# ---------------------------------------------------------------------------
+# 8c. 人类前端协作接口（human_action）
+# ---------------------------------------------------------------------------
+# 设计原则：人机操作独立累计、互不阻塞——不存在"小机先做了人类白等"。
+# - 不推进天数、不写盘：只改内存 state，是否持久化由上层决定。
+# - 不触碰主 RNG 序列（rng_state）：文案与回访延迟全部确定性取值。
+# - 不在对应灾害/季节中时直接拒绝：{"ok": False, "error": 错误码, "message": 说明}。
+# - 成功时返回 {"ok": True, "action", "message", "events", "summary"}，
+#   events 为连带触发的成就等事件行，summary 为该 action 的结构化状态摘要。
+
+HUMAN_SKIM_TARGET = 20.0   # 单次捞藻达标线：达标缩短绿潮 1 天，未达标则次日少扣溶氧
+HUMAN_SKIM_MAX = 50.0      # 单次捞藻量服务端上限（防作弊 clamp）
+HUMAN_PULL_MAX = 0.15      # 单次拔水葫芦覆盖率削减上限（防作弊 clamp）
+HUMAN_RAT_MAX = 5          # 单次打田鼠数量上限（防作弊 clamp）
+RAT_CALM_THRESHOLD = 5     # 田鼠降到 ≤5 只时鼠患提前平息（与逐日破坏阈值对齐）
+
+
+def _human_reject(error, message):
+    return {"ok": False, "error": error, "message": message}
+
+
+def _human_clear_pending(state, event):
+    """人类把灾害处理掉后，撤销已失去意义的同名待决策；返回被打断的 wait 天数。"""
+    pc = state.get("pending_choice")
+    if not (pc and pc.get("event") == event):
+        return 0
+    state["pending_choice"] = None
+    remaining = state.get("pending_wait_days", 0)
+    state["pending_wait_days"] = 0
+    return remaining
+
+
+def _human_folio_note(state, key, note):
+    rec = state["folio"].setdefault("disasters", {}).setdefault(
+        key, {"count": 0, "first_day": state["turn"], "days": [], "notes": []})
+    if note not in rec.setdefault("notes", []):
+        rec["notes"].append(note)
+
+
+def _human_expel_turtle(state, payload, events):
+    turtle = state["flags"].get("brazilian_turtle")
+    if turtle == "expelled_once":
+        return _human_reject("not_active", "巴西龟刚被赶走，还没有回来，暂时不用出手。")
+    if turtle != "active":
+        return _human_reject("not_active", "池塘里现在没有巴西龟。")
+    msg = _expel_turtle_effect(state, events, "human")
+    _human_folio_note(state, "巴西龟入侵", "人类在前端帮忙驱赶")
+    f = state["flags"]
+    summary = {
+        "turtle": f["brazilian_turtle"],
+        "human_expel_count": f["human_expel_count"],
+        "ai_expel_count": f["ai_expel_count"],
+        "total_expel_count": f["human_expel_count"] + f["ai_expel_count"],
+        # 无论暂离还是彻底赶走，同名待决策都已失去意义
+        "interrupted_wait_days": _human_clear_pending(state, "巴西龟入侵"),
+    }
+    if f["brazilian_turtle"] == "expelled_once":
+        summary["return_day"] = f.get("brazilian_turtle_return_day")
+    return {"ok": True, "message": msg, "summary": summary}
+
+
+def _human_catch_snail(state, payload, events):
+    apple = state["flags"].get("apple_snail")
+    clearing = isinstance(apple, dict) and apple.get("status") == "clearing"
+    if apple != "active" and not clearing:
+        return _human_reject("not_active", "石头上现在没有福寿螺。")
+    # 效果等同小机在决策中选「手动捞」：一次清光，碎屑 +10
+    state["flags"]["apple_snail"] = "gone"
+    state["env"]["detritus"] += 10
+    f = state["flags"]
+    f["human_snail_catch_count"] = f.get("human_snail_catch_count", 0) + 1
+    msg = _pick_t(state, DISASTER_TEXT["福寿螺入侵"]["hand"])
+    _chronicle(state, DISASTER_TEXT["福寿螺入侵"]["chronicle"])
+    _human_folio_note(state, "福寿螺入侵", "人类在前端帮忙捞螺")
+    summary = {
+        "apple_snail": "gone",
+        "human_snail_catch_count": f["human_snail_catch_count"],
+        "detritus": round(state["env"]["detritus"], 2),
+        "interrupted_wait_days": _human_clear_pending(state, "福寿螺入侵"),
+    }
+    return {"ok": True, "message": msg, "summary": summary}
+
+
+def _human_pull_hyacinth(state, payload, events):
+    hy = state["flags"].get("water_hyacinth")
+    if not isinstance(hy, dict):
+        return _human_reject("not_active", "水面上现在没有水葫芦。")
+    if state["turn"] < hy.get("day", state["turn"]) + 3:
+        return _human_reject("not_active", "水边那点绿意还看不真切，先等它露出真面目。")
+    try:
+        reduce = float(payload.get("cover", 0))
+    except (TypeError, ValueError):
+        return _human_reject("bad_payload", "payload.cover 需要是一个数值（本次减少的覆盖率）。")
+    if reduce <= 0:
+        return _human_reject("bad_payload", "payload.cover 需要大于 0。")
+    reduce = min(reduce, HUMAN_PULL_MAX)   # 服务端 clamp 上限，防作弊
+    before = hy.get("cover", 0.04)
+    after = max(0.0, before - reduce)
+    applied = before - after
+    hy["cover"] = after
+    hy["human_pull"] = round(hy.get("human_pull", 0.0) + applied, 4)
+    # 根须带泥：轻微搅浑
+    state["env"]["turbidity"] = _clamp(state["env"]["turbidity"] + 0.05, 0.0, 1.0)
+    cleared = after <= 1e-9
+    summary = {"applied": round(applied, 4), "cover_left": round(after, 4),
+               "human_pull_total": hy["human_pull"], "cleared": cleared}
+    if cleared:
+        state["flags"]["water_hyacinth"] = None
+        _chronicle(state, DISASTER_TEXT["水葫芦飘入"]["chronicle"])
+        _human_folio_note(state, "水葫芦飘入", "人类在前端帮忙拔除")
+        summary["interrupted_wait_days"] = _human_clear_pending(state, "水葫芦飘入")
+        msg = _pick_t(state, DISASTER_TEXT["水葫芦飘入"]["remove"])
+    else:
+        _human_folio_note(state, "水葫芦飘入", "人类在前端帮忙拔除")
+        msg = "拔掉了一片水葫芦，水面松了一口气，但边角处还剩下一些。"
+    return {"ok": True, "message": msg, "summary": summary}
+
+
+def _human_hunt_rat(state, payload, events):
+    bio = state["flags"].setdefault("bio_disasters", {})
+    rat = bio.get("鼠患")
+    if not rat:
+        return _human_reject("not_active", "岸边现在没有鼠患。")
+    try:
+        count = int(payload.get("count", 1))
+    except (TypeError, ValueError):
+        return _human_reject("bad_payload", "payload.count 需要是一个整数（本次打到的田鼠数）。")
+    if count <= 0:
+        return _human_reject("bad_payload", "payload.count 需要大于 0。")
+    count = min(count, HUMAN_RAT_MAX)      # 服务端 clamp 上限，防作弊
+    pop = state["populations"]
+    before = pop.get("田鼠", 0.0)
+    after = max(0.0, before - count)
+    applied = before - after
+    pop["田鼠"] = after
+    rat["human_hits"] = rat.get("human_hits", 0) + int(round(applied))
+    over = after <= RAT_CALM_THRESHOLD
+    summary = {"hits": int(round(applied)), "rats_left": int(after),
+               "human_hits_total": rat["human_hits"], "plague_over": over}
+    _human_folio_note(state, "鼠患", "人类在前端帮忙打田鼠")
+    if over:
+        bio.pop("鼠患", None)
+        msg = "洞口安静下来了。剩下的田鼠缩回草丛深处，岸边的窸窣声停了——鼠患平息了。"
+    else:
+        msg = "打退了几只田鼠，但洞口还在冒出新的脑袋，岸边仍不太平。"
+    return {"ok": True, "message": msg, "summary": summary}
+
+
+def _human_skim_algae(state, payload, events):
+    bio = state["flags"].setdefault("bio_disasters", {})
+    green = bio.get("绿潮")
+    if not green:
+        return _human_reject("not_active", "水面现在没有绿潮。")
+    if green.get("human_skim_day") == state["turn"]:
+        return _human_reject("already_today", "今天已经捞过藻了，明天再来。")
+    try:
+        amount = float(payload.get("amount", 0))
+    except (TypeError, ValueError):
+        return _human_reject("bad_payload", "payload.amount 需要是一个数值（本次捞走的藻量）。")
+    if amount <= 0:
+        return _human_reject("bad_payload", "payload.amount 需要大于 0。")
+    amount = min(amount, HUMAN_SKIM_MAX)   # 服务端 clamp 上限，防作弊
+    pop = state["populations"]
+    applied = min(amount, pop.get("水藻", 0.0))
+    pop["水藻"] = max(0.0, pop.get("水藻", 0.0) - applied)
+    green["human_skim_day"] = state["turn"]
+    green["human_skim_total"] = round(green.get("human_skim_total", 0.0) + amount, 2)
+    skim_total = green["human_skim_total"]
+    target_met = amount >= HUMAN_SKIM_TARGET
+    ended = False
+    if target_met:
+        green["remaining"] -= 1            # 达标：绿潮缩短 1 天
+        if green["remaining"] <= 0:
+            bio.pop("绿潮", None)
+            ended = True
+            msg = "一网又一网，厚绿被整片掀开，水面重新透出光来——绿潮散了。"
+        else:
+            msg = "捞走了厚厚一层藻，水下亮了一些。照这个劲头，绿潮会更早散去。"
+    else:
+        green["do_relief_day"] = state["turn"] + 1   # 未达标：次日少扣一半溶氧
+        msg = "捞走了一些浮藻，水面裂开几道缝隙，明天水底能稍微喘口气。"
+    _human_folio_note(state, "绿潮", "人类在前端帮忙捞藻")
+    summary = {"applied": round(applied, 2), "algae_left": _ipop(state, "水藻"),
+               "target_met": target_met, "ended": ended,
+               "remaining_days": 0 if ended else green["remaining"],
+               "human_skim_total": skim_total}
+    return {"ok": True, "message": msg, "summary": summary}
+
+
+def _human_crack_ice(state, payload, events):
+    f = state["flags"]
+    if state.get("season") != "冬" or not f.get("ice_on"):
+        return _human_reject("not_active", "水面现在没有结冰，不需要凿冰。")
+    if f.get("crack_count", 0) >= 3:
+        return _human_reject("crack_limit", "冰面已经凿得够多了，再凿水温会降得更低。")
+    f["crack_count"] = f.get("crack_count", 0) + 1       # 与小机共享每冬 3 次上限
+    f["human_crack_count"] = f.get("human_crack_count", 0) + 1
+    _chain_set(state, "ice_hole", 3)                      # 与小机凿冰同效：3 天溶氧回补
+    f["ice_suff_pause_day"] = state["turn"] + 1           # 次日冰窒息值不涨
+    msg = "冰面凿开了一个碗口大的洞，水汽从洞口冒出来。今天池塘可以透口气，窒息值不会上涨。"
+    summary = {"crack_count": f["crack_count"], "human_crack_count": f["human_crack_count"],
+               "ice_suffocation": f.get("ice_suffocation", 0),
+               "pause_day": f["ice_suff_pause_day"]}
+    return {"ok": True, "message": msg, "summary": summary}
+
+
+_HUMAN_ACTIONS = {
+    "expel_turtle": _human_expel_turtle,
+    "catch_snail": _human_catch_snail,
+    "pull_hyacinth": _human_pull_hyacinth,
+    "hunt_rat": _human_hunt_rat,
+    "skim_algae": _human_skim_algae,
+    "crack_ice": _human_crack_ice,
+}
+
+
+def human_action(state, action, payload=None):
+    """人类前端参与灾害的统一入口：一次前端小游戏的结果上报。
+
+    入参：state（内存态存档）、action（见 _HUMAN_ACTIONS）、payload（action 专属参数）。
+    出参：{"ok": bool, "action": str, "message": str, "error": 仅失败时,
+           "events": 连带事件行（如成就解锁）, "summary": 结构化状态摘要}。
+    不推进天数、不写盘、不消耗主 RNG 序列。
+    """
+    handler = _HUMAN_ACTIONS.get(action)
+    if handler is None:
+        return {"ok": False, "action": action, "error": "unknown_action",
+                "message": "未知的人类协作动作：%s" % action}
+    if payload is None:
+        payload = {}
+    if not isinstance(payload, dict):
+        return {"ok": False, "action": action, "error": "bad_payload",
+                "message": "payload 需要是一个对象。"}
+    events = []
+    result = handler(state, payload, events)
+    result["action"] = action
+    if result.get("ok"):
+        result["events"] = events
+    return result
 
 
 def _gaze_pick(state, r, options):
