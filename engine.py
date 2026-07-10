@@ -454,7 +454,10 @@ SETTLER_LEAVE_NAMED = {
         "age_chron": "{nickname}在某个清晨离去，池塘的水面再也不见那道细长的波纹。",
     },
     "野鸭": {
-        # 饥饿离开写的是一对；年迈离开明确是当前这只个体。
+        "starve": [
+            "{nickname}在水面停了很久，把喙埋进翅膀又抽出来。然后它蹬水，拍翅，从池塘上空飞了过去。没再落下来。",
+            "水面最后一圈涟漪从{nickname}脚下散开。它飞起来的时候，翅膀拍得比平时慢，但方向没犹豫。池塘的倒影里，那团褐色越来越小。",
+        ],
         "age": "年老的{nickname}在一个秋日悄然离群，独自飞向南方，再也没有回来。",
         "age_chron": "年老的{nickname}在秋日离群南飞，再也没有回来。",
     },
@@ -879,16 +882,31 @@ SETTLER_HIBERNATE_TEXT = {
     "流浪乌龟": ["乌龟缩进壳里，慢慢沉到水底的淤泥中。它不吃也不动，把整个冬天睡了过去。"],
 }
 SETTLER_HIBERNATE_TEXT_NAMED = {
-    "水蛇": ["{nickname}缓缓盘紧身体，钻进芦苇根部的枯叶堆里，一动不动。"],
-    "流浪乌龟": ["{nickname}缩进壳里，慢慢沉到水底的淤泥中。它不吃也不动，把整个冬天睡了过去。"],
+    "水蛇": [
+        "{nickname}缓缓盘紧身体，钻进芦苇根部的枯叶堆里，一动不动。",
+        "石缝深处，{nickname}盘成紧紧的一团。信子最后一次探出来，碰到自己的鳞片，然后停住了。",
+        "{nickname}滑进芦苇根最密的那一处，身子一圈圈松下来。水面最后一道细纹也散了。",
+    ],
+    "流浪乌龟": [
+        "{nickname}缩进壳里，慢慢沉到水底的淤泥中。它不吃也不动，把整个冬天睡了过去。",
+        "水底的淤泥翻起一小团浑浊。{nickname}把四只脚收进去，壳慢慢沉到底。不动了。",
+        "{nickname}缩进壳里，最后一只脚收进去的动作很慢。淤泥漫过壳沿，盖住了上面的花纹。",
+    ],
 }
 SETTLER_WAKE_TEXT = {
     "水蛇": ["芦苇丛深处有什么在动。水蛇从枯叶堆里探出头，吐了吐信子，慢慢滑向水面。"],
     "流浪乌龟": TURTLE_WAKE_TEXT,
 }
 SETTLER_WAKE_TEXT_NAMED = {
-    "水蛇": ["芦苇丛深处有什么在动。{nickname}从枯叶堆里探出头，吐了吐信子，慢慢滑向水面。"],
-    "流浪乌龟": TURTLE_WAKE_TEXT_NAMED,
+    "水蛇": [
+        "芦苇丛深处有什么在动。{nickname}从枯叶堆里探出头，吐了吐信子，慢慢滑向水面。",
+        "石缝里探出一截信子，颤了几下缩回去。过了一阵，{nickname}的头慢慢滑出来，鳞片碰到石沿，发出很轻的声响。",
+        "芦苇根动了动。{nickname}从盘着的状态慢慢松开，一节一节滑进水里。游得很慢，像在试水温。",
+    ],
+    "流浪乌龟": TURTLE_WAKE_TEXT_NAMED + [
+        "淤泥里有什么拱了一下。{nickname}的壳慢慢浮起来，四只脚从壳沿伸出来，软软地搭在水里。",
+        "水底的浑浊散开，{nickname}伸长脖子，嘴巴张开合了几下。光打回它壳上的时候，它眨了眨眼。",
+    ],
 }
 
 SETTLER_HIBERNATE_CHRON = {
@@ -910,7 +928,32 @@ SETTLER_WAKE_CHRON_NAMED = {
 
 SETTLER_BREED_CHRON = "%s 在池塘繁衍了下一代——池塘有了二代住客。"
 SETTLER_GROWN_CHRON = "那只幼年的%s长成了，开始独自在池塘讨生活。"
-SETTLER_GROWN_CHRON_NAMED = "幼年的{nickname}长成了，开始独自在池塘讨生活。"
+SETTLER_GROWN_CHRON_NAMED = {
+    "翠鸟": [
+        "{nickname}的个头够了。羽上的纹路长齐了。",
+        "{nickname}不再跟在别的影子后面了。它自己就是一道完整的影子。",
+    ],
+    "苍鹭": [
+        "{nickname}的个头够了。羽上的纹路长齐了。",
+        "{nickname}不再跟在别的影子后面了。它自己就是一道完整的影子。",
+    ],
+    "野鸭": [
+        "{nickname}的个头够了。羽上的纹路长齐了。",
+        "{nickname}不再跟在别的影子后面了。它自己就是一道完整的影子。",
+    ],
+    "水蛇": [
+        "{nickname}的个头够了。鳞上的纹路长齐了。",
+        "{nickname}不再跟在别的影子后面了。它自己就是一道完整的影子。",
+    ],
+    "流浪乌龟": [
+        "{nickname}的个头够了。壳上的纹路长齐了。",
+        "{nickname}不再跟在别的影子后面了。它自己就是一道完整的影子。",
+    ],
+    "螃蟹": [
+        "{nickname}的个头够了。壳上的纹路长齐了。",
+        "{nickname}不再跟在别的影子后面了。它自己就是一道完整的影子。",
+    ],
+}
 SETTLER_RESIDENT_LIMIT = 8
 
 # 定居者食物不足预警（每种 轻/重 各 3 套）
@@ -987,7 +1030,11 @@ SETTLER_WARN_LIGHT_NAMED = {
     ]),
     "野鸭": _named_versions(SETTLER_WARN_LIGHT["野鸭"], [
         ("野鸭", "{nickname}"), None, None,
-    ]),
+    ]) + [
+        "{nickname}把喙探进水里，搅了几下就抬起来。这次什么都没滤到，它往深处游了一点。",
+        "水面下的{nickname}倒立了很久。尾羽翘得高高的，却总也没见它叼上来什么。",
+        "{nickname}沿着池塘边绕了一圈，喙不时点进水里。每次抬起来，都是空的。",
+    ],
     "流浪乌龟": _named_versions(SETTLER_WARN_LIGHT["流浪乌龟"], [
         ("乌龟", "{nickname}"), ("乌龟", "{nickname}"), ("它浮", "{nickname}浮"),
     ]),
@@ -1007,7 +1054,11 @@ SETTLER_WARN_HEAVY_NAMED = {
     ]),
     "野鸭": _named_versions(SETTLER_WARN_HEAVY["野鸭"], [
         None, None, ("野鸭", "{nickname}"),
-    ]),
+    ]) + [
+        "{nickname}浮在水上，胸脯起伏得又浅又快。喙探进水里只湿了个尖，就再没力气伸下去了。",
+        "{nickname}的羽毛贴在身上，没了从前那层油亮。它在水面漂着，风吹到哪算哪。",
+        "水底有东西闪了一下。{nickname}伸了伸脖子，最终还是没把喙放进水里。",
+    ],
     "流浪乌龟": _named_versions(SETTLER_WARN_HEAVY["流浪乌龟"], [
         ("乌龟", "{nickname}"), ("它在", "{nickname}在"), ("乌龟", "{nickname}"),
     ]),
@@ -1020,8 +1071,58 @@ SETTLER_WARN_HEAVY_NAMED = {
 }
 SETTLER_WARN_CHRON_LIGHT = "%s 开始吃不饱了。"
 SETTLER_WARN_CHRON_HEAVY = "%s 濒临饿死，命悬一线。"
-SETTLER_WARN_CHRON_LIGHT_NAMED = "{nickname}开始吃不饱了。"
-SETTLER_WARN_CHRON_HEAVY_NAMED = "{nickname}濒临饿死，命悬一线。"
+SETTLER_WARN_CHRON_LIGHT_NAMED = {
+    "翠鸟": [
+        "{nickname}开始花更多时间盯住水面。喙探下去的次数多了，抬上来的动静少了。",
+        "{nickname}的觅食时间拉长了。水面留下的细纹比从前密，但搅起的泥星很少。",
+    ],
+    "苍鹭": [
+        "{nickname}开始花更多时间盯住水面。喙探下去的次数多了，抬上来的动静少了。",
+        "{nickname}的觅食时间拉长了。水面留下的细纹比从前密，但搅起的泥星很少。",
+    ],
+    "野鸭": [
+        "{nickname}开始花更多时间盯住水面。喙探下去的次数多了，抬上来的动静少了。",
+        "{nickname}的觅食时间拉长了。水面留下的细纹比从前密，但搅起的泥星很少。",
+    ],
+    "水蛇": [
+        "{nickname}开始花更多时间盯住水面。嘴探下去的次数多了，抬上来的动静少了。",
+        "{nickname}的觅食时间拉长了。水面留下的细纹比从前密，但搅起的泥星很少。",
+    ],
+    "流浪乌龟": [
+        "{nickname}开始花更多时间盯住水面。嘴探下去的次数多了，抬上来的动静少了。",
+        "{nickname}的觅食时间拉长了。水面留下的细纹比从前密，但搅起的泥星很少。",
+    ],
+    "螃蟹": [
+        "{nickname}开始花更多时间盯住水面。嘴探下去的次数多了，抬上来的动静少了。",
+        "{nickname}的觅食时间拉长了。水面留下的细纹比从前密，但搅起的泥星很少。",
+    ],
+}
+SETTLER_WARN_CHRON_HEAVY_NAMED = {
+    "翠鸟": [
+        "{nickname}的肋骨显出来了。它还在觅食，只是动作越来越慢。",
+        "{nickname}把剩下的力气都用在了水边。但水里能回应它的东西不多了。",
+    ],
+    "苍鹭": [
+        "{nickname}的肋骨显出来了。它还在觅食，只是动作越来越慢。",
+        "{nickname}把剩下的力气都用在了水边。但水里能回应它的东西不多了。",
+    ],
+    "野鸭": [
+        "{nickname}的肋骨显出来了。它还在觅食，只是动作越来越慢。",
+        "{nickname}把剩下的力气都用在了水边。但水里能回应它的东西不多了。",
+    ],
+    "水蛇": [
+        "{nickname}的身条显出来了。它还在觅食，只是动作越来越慢。",
+        "{nickname}把剩下的力气都用在了水边。但水里能回应它的东西不多了。",
+    ],
+    "流浪乌龟": [
+        "{nickname}的壳沿显出来了。它还在觅食，只是动作越来越慢。",
+        "{nickname}把剩下的力气都用在了水边。但水里能回应它的东西不多了。",
+    ],
+    "螃蟹": [
+        "{nickname}的壳沿显出来了。它还在觅食，只是动作越来越慢。",
+        "{nickname}把剩下的力气都用在了水边。但水里能回应它的东西不多了。",
+    ],
+}
 
 # ---------------------------------------------------------------------------
 # 2c. 决策事件（choose 机制）
@@ -1683,12 +1784,43 @@ OBSERVE_AMBIENT = {
     ],
 }
 OBSERVE_SETTLER_NAMED = {
-    "流浪乌龟": _named_versions([OBSERVE_AMBIENT["settler"][0]], [("乌龟", "{nickname}")]),
-    "翠鸟": _named_versions([OBSERVE_AMBIENT["settler"][1]], [("翠鸟", "{nickname}")]),
-    "苍鹭": _named_versions([OBSERVE_AMBIENT["settler"][2]], [("苍鹭", "{nickname}")]),
-    "水蛇": _named_versions([OBSERVE_AMBIENT["settler"][3]], [("水蛇", "{nickname}")]),
-    # 野鸭原文明确是并排游动的多只个体。
-    "螃蟹": _named_versions([OBSERVE_AMBIENT["settler"][5]], [("螃蟹", "{nickname}")]),
+    "流浪乌龟": _named_versions([OBSERVE_AMBIENT["settler"][0]], [("乌龟", "{nickname}")]) + [
+        "{nickname}趴在那块石头上，四只脚摊开。光斑从壳上慢慢移过去，它连头都没转。",
+        "石头上{nickname}伸长脖子，对准太阳的方向。眼睛闭着，嘴巴微微张开一条缝。",
+        "{nickname}从石头上滑进水里，划了几下又爬上另一块石头。壳上的水痕很快就干了。",
+        "下午的光斜过来，{nickname}把头和脚都缩进壳里一半。石头上就剩一个安静的圆。",
+    ],
+    "翠鸟": _named_versions([OBSERVE_AMBIENT["settler"][1]], [("翠鸟", "{nickname}")]) + [
+        "{nickname}在枯枝上理了理翅膀，蓝羽顺下去又翘起来。水面没什么动静，它就那么待着。",
+        "光打在{nickname}背上，蓝得发绿。它偏头看了看水下，没动，又把头转回去了。",
+        "{nickname}甩掉羽尖的水珠，爪子在枯枝上蹭了几下。风过来的时候，它眯了眯眼。",
+        "水面静了很久。{nickname}在枝头把喙藏进胸前的羽毛里，只露出一小截蓝色。",
+    ],
+    "苍鹭": _named_versions([OBSERVE_AMBIENT["settler"][2]], [("苍鹭", "{nickname}")]) + [
+        "{nickname}单腿立在浅水处，脖子缩成一道弯。水没过它的细腿，纹丝不动。",
+        "风吹过苇丛，{nickname}的冠羽轻轻晃了一下。它的喙尖离水面只差一点，就那么停着。",
+        "{nickname}慢慢把一只腿从水里提起来，换了一边。整个过程水都没响一声。",
+        "暮色漫下来的时候，{nickname}还站在浅滩上。影子拉得比它本身长了好几倍。",
+    ],
+    "水蛇": _named_versions([OBSERVE_AMBIENT["settler"][3]], [("水蛇", "{nickname}")]) + [
+        "{nickname}从石缝探出半个头，信子吐了两下又缩回去。水面只荡开几圈细纹。",
+        "芦苇根上缠着一截鳞光。{nickname}盘得很松，头搭在身子上，半天没动过。",
+        "{nickname}在水面划了一道细痕，游到池塘中间停了停，又折回原来的石缝。",
+        "水底的阴影里，{nickname}把自己盘成了一圈。信子偶尔探出来，又收回去。",
+    ],
+    "野鸭": [
+        "{nickname}划过水面，身后两道波纹渐渐合成一片。它游过的地方，浮萍缺了几块，边缘参差。",
+        "{nickname}在水面漂着，偶尔把喙伸进水里滤几下。涟漪从它身下慢慢荡开。",
+        "风推着{nickname}往池塘西角漂。它没划水，就那么浮着，随浪晃。",
+        "{nickname}把头埋进翅膀里，在水面上缩成一团褐色。漂了很久，位置都没怎么变。",
+        "{nickname}抖了抖尾羽，几滴水珠落回池塘。它伸长脖子看了看四周，又把头收回翅膀里。",
+    ],
+    "螃蟹": _named_versions([OBSERVE_AMBIENT["settler"][5]], [("螃蟹", "{nickname}")]) + [
+        "{nickname}从洞口侧身挤出来，在沙地上停了一下。螯举到半空，又放下了。",
+        "沙地上{nickname}横着走了几步，留下一行浅孔。走到水边沾了沾水，又横着走回去。",
+        "{nickname}守在洞口，两只螯搭在沙地上。一片碎浪漫上来，淹过它的壳沿，它没退。",
+        "潮线退下去以后，{nickname}从洞里探出螯。左右晃了晃，夹住一缕水草拖进洞里。",
+    ],
 }
 
 # 灾害进行中的 observe 专属描写（按持续天气类型选择）
@@ -5038,7 +5170,7 @@ def _settler_warn_chronicle(state, s):
             warn_dedup[day_key] = True
             warning = _pick_settler_text(
                 state, None, s, [SETTLER_WARN_CHRON_HEAVY % name],
-                [SETTLER_WARN_CHRON_HEAVY_NAMED], mode="first",
+                SETTLER_WARN_CHRON_HEAVY_NAMED.get(name), mode="turn",
             )
             _chronicle(state, warning, key=False)
     elif 0.3 <= h < 0.5 and lvl < 1:
@@ -5047,7 +5179,7 @@ def _settler_warn_chronicle(state, s):
             warn_dedup[day_key] = True
             warning = _pick_settler_text(
                 state, None, s, [SETTLER_WARN_CHRON_LIGHT % name],
-                [SETTLER_WARN_CHRON_LIGHT_NAMED], mode="first",
+                SETTLER_WARN_CHRON_LIGHT_NAMED.get(name), mode="turn",
             )
             _chronicle(state, warning, key=False)
     elif h >= 0.5 and lvl != 0:
@@ -5074,7 +5206,7 @@ def _process_settlers(state, events, r):
                     del hibs[:len(hibs) - 2]
                 sleep_text = _pick_settler_text(
                     state, None, s, SETTLER_HIBERNATE_TEXT[name],
-                    SETTLER_HIBERNATE_TEXT_NAMED[name], mode="first",
+                    SETTLER_HIBERNATE_TEXT_NAMED[name], mode="turn",
                 )
                 events.append("settler:" + sleep_text)
                 sleep_chron = _pick_settler_text(
@@ -5123,7 +5255,7 @@ def _process_settlers(state, events, r):
                     events.append("settler_grown:" + grown_text)
                 grown_chron = _pick_settler_text(
                     state, None, s, [SETTLER_GROWN_CHRON % name],
-                    [SETTLER_GROWN_CHRON_NAMED], mode="first",
+                    SETTLER_GROWN_CHRON_NAMED.get(name), mode="turn",
                 )
                 _chronicle(state, grown_chron)
         # 摄食
@@ -5163,14 +5295,18 @@ def _process_settlers(state, events, r):
             leave_unnamed = txt.get("starve", "%s 找不到食物，离开了池塘。" % name)
             leave_named = SETTLER_LEAVE_NAMED.get(name, {}).get("starve")
             leave = _pick_settler_text(
-                state, None, s, [leave_unnamed], [leave_named] if leave_named else None,
-                mode="first",
+                state, None, s, [leave_unnamed],
+                (leave_named if isinstance(leave_named, list)
+                 else [leave_named] if leave_named else None),
+                mode="turn",
             )
             chron_unnamed = txt.get("starve_chron", leave_unnamed)
             chron_named = SETTLER_LEAVE_NAMED.get(name, {}).get("starve_chron", leave_named)
             leave_chron = _pick_settler_text(
-                state, None, s, [chron_unnamed], [chron_named] if chron_named else None,
-                mode="first",
+                state, None, s, [chron_unnamed],
+                (chron_named if isinstance(chron_named, list)
+                 else [chron_named] if chron_named else None),
+                mode="turn",
             )
             leave_reason = "food"
         elif s["age"] >= extended_max_age:
@@ -6542,7 +6678,9 @@ def _classify_event(ev):
         if who is None:
             leave_named = {
                 n: list(LONGEVITY_LEAVE_TEXT_NAMED[n])
-                   + list(SETTLER_LEAVE_NAMED.get(n, {}).values())
+                   + [item
+                      for value in SETTLER_LEAVE_NAMED.get(n, {}).values()
+                      for item in (value if isinstance(value, list) else [value])]
                 for n in SETTLER_TYPES
             }
             leave_named["翠鸟"] += KINGFISHER_WINTER_LEAVE_NAMED

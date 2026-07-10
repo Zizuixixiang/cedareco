@@ -133,7 +133,9 @@ def static_cases():
         for field, named in named_fields.items():
             original = engine.SETTLER_TEXT[species].get(field)
             if original is not None:
-                cases.append(("SETTLER_TEXT.%s.%s" % (species, field), species, original, named))
+                pool = named if isinstance(named, list) else [named]
+                cases.append(("SETTLER_TEXT.%s.%s" % (species, field), species,
+                              original, pool))
     for label, originals, named in (
             ("SETTLER_HINTS", engine.SETTLER_HINTS, engine.SETTLER_HINTS_NAMED),
             ("SETTLER_PREY_GONE", engine.SETTLER_PREY_GONE, engine.SETTLER_PREY_GONE_NAMED),
@@ -142,47 +144,162 @@ def static_cases():
             ("SETTLER_WAKE_CHRON", engine.SETTLER_WAKE_CHRON,
              engine.SETTLER_WAKE_CHRON_NAMED)):
         for species, rewritten in named.items():
-            cases.append(("%s.%s" % (label, species), species, originals[species], rewritten))
+            cases.append(("%s.%s" % (label, species), species,
+                          originals[species], [rewritten]))
     for species in engine.SETTLER_HIBERNATE_TEXT:
         cases.append(("SETTLER_HIBERNATE_TEXT.%s" % species, species,
                       engine.SETTLER_HIBERNATE_TEXT[species][0],
-                      engine.SETTLER_HIBERNATE_TEXT_NAMED[species][0]))
-    for label, species, original, rewritten in (
-            ("SETTLER_GROWN_CHRON", "翠鸟", engine.SETTLER_GROWN_CHRON % "翠鸟",
+                      engine.SETTLER_HIBERNATE_TEXT_NAMED[species]))
+    for label, original, named in (
+            ("SETTLER_GROWN_CHRON", engine.SETTLER_GROWN_CHRON,
              engine.SETTLER_GROWN_CHRON_NAMED),
-            ("SETTLER_WARN_CHRON_LIGHT", "翠鸟", engine.SETTLER_WARN_CHRON_LIGHT % "翠鸟",
+            ("SETTLER_WARN_CHRON_LIGHT", engine.SETTLER_WARN_CHRON_LIGHT,
              engine.SETTLER_WARN_CHRON_LIGHT_NAMED),
-            ("SETTLER_WARN_CHRON_HEAVY", "翠鸟", engine.SETTLER_WARN_CHRON_HEAVY % "翠鸟",
+            ("SETTLER_WARN_CHRON_HEAVY", engine.SETTLER_WARN_CHRON_HEAVY,
              engine.SETTLER_WARN_CHRON_HEAVY_NAMED)):
-        cases.append((label, species, original, rewritten))
+        for species, rewritten in named.items():
+            cases.append(("%s.%s" % (label, species), species,
+                          original % species, rewritten))
     for kind in engine.SHORT_HUNT:
         cases.append(("SHORT_HUNT.%s" % kind, "翠鸟",
-                      engine.SHORT_HUNT[kind] % "翠鸟", engine.SHORT_HUNT_NAMED["翠鸟"][kind]))
+                      engine.SHORT_HUNT[kind] % "翠鸟",
+                      [engine.SHORT_HUNT_NAMED["翠鸟"][kind]]))
     for label, species, original, rewritten in cases:
-        unnamed_state, unnamed = state_for(species)
-        named_state, named_settler = state_for(species, NICKNAME)
-        actual = engine._pick_settler_text(
-            unnamed_state, None, unnamed, [original], [rewritten], mode="first")
-        personalized = engine._pick_settler_text(
-            named_state, None, named_settler, [original], [rewritten], mode="first")
-        assert actual == original, "%s 无昵称兜底改变" % label
-        assert NICKNAME in personalized, "%s 未写入正确昵称" % label
+        for turn in range(len(rewritten)):
+            unnamed_state, unnamed = state_for(species, turn=turn)
+            named_state, named_settler = state_for(species, NICKNAME, turn=turn)
+            actual = engine._pick_settler_text(
+                unnamed_state, None, unnamed, [original], rewritten, mode="turn")
+            personalized = engine._pick_settler_text(
+                named_state, None, named_settler, [original], rewritten, mode="turn")
+            assert actual == original, "%s 无昵称兜底改变" % label
+            assert NICKNAME in personalized, "%s 未写入正确昵称" % label
     return len(cases)
 
 
 def verify_observe_ambient():
     for species in engine.OBSERVE_SETTLER_NAMED:
-        unnamed_state, _ = state_for(species)
-        named_state, named = state_for(species, NICKNAME)
-        unnamed_state["turn"] = named_state["turn"] = 0
-        assert engine._pick_settler_ambient(unnamed_state) \
-            == engine._pick_ambient(unnamed_state, engine.OBSERVE_AMBIENT["settler"])
-        assert NICKNAME in engine._pick_settler_ambient(named_state)
+        pool = engine.OBSERVE_SETTLER_NAMED[species]
+        assert len(pool) == 5, "%s observe named 池不是 5 条" % species
+        for turn in range(len(pool)):
+            unnamed_state, _ = state_for(species, turn=turn)
+            named_state, _ = state_for(species, NICKNAME, turn=turn)
+            assert engine._pick_settler_ambient(unnamed_state) \
+                == engine._pick_ambient(unnamed_state, engine.OBSERVE_AMBIENT["settler"])
+            personalized = engine._pick_settler_ambient(named_state)
+            assert personalized == engine._text_value(pool[turn]).format(nickname=NICKNAME)
+        named_state, named = state_for(species, NICKNAME, turn=0)
         second = copy.deepcopy(named)
         second["nickname"] = "阿岚"
         named_state["settlers"].append(second)
         ambiguous = engine._pick_settler_ambient(named_state)
         assert NICKNAME not in ambiguous and "阿岚" not in ambiguous
+
+
+def verify_expanded_named_pools():
+    expected_counts = {
+        "observe": {species: 5 for species in engine.SETTLER_TYPES},
+        "warn_light_duck": {"野鸭": 4},
+        "warn_heavy_duck": {"野鸭": 4},
+        "starve_duck": {"野鸭": 2},
+        "hibernate": {"流浪乌龟": 3, "水蛇": 3},
+        "wake": {"流浪乌龟": 4, "水蛇": 3},
+        "grown_chron": {species: 2 for species in engine.SETTLER_TYPES},
+        "warn_light_chron": {species: 2 for species in engine.SETTLER_TYPES},
+        "warn_heavy_chron": {species: 2 for species in engine.SETTLER_TYPES},
+    }
+    pools = {
+        "observe": engine.OBSERVE_SETTLER_NAMED,
+        "warn_light_duck": {"野鸭": engine.SETTLER_WARN_LIGHT_NAMED["野鸭"]},
+        "warn_heavy_duck": {"野鸭": engine.SETTLER_WARN_HEAVY_NAMED["野鸭"]},
+        "starve_duck": {"野鸭": engine.SETTLER_LEAVE_NAMED["野鸭"]["starve"]},
+        "hibernate": engine.SETTLER_HIBERNATE_TEXT_NAMED,
+        "wake": engine.SETTLER_WAKE_TEXT_NAMED,
+        "grown_chron": engine.SETTLER_GROWN_CHRON_NAMED,
+        "warn_light_chron": engine.SETTLER_WARN_CHRON_LIGHT_NAMED,
+        "warn_heavy_chron": engine.SETTLER_WARN_CHRON_HEAVY_NAMED,
+    }
+    for label, counts in expected_counts.items():
+        for species, count in counts.items():
+            pool = pools[label][species]
+            assert len(pool) == count, "%s.%s 条数错误" % (label, species)
+            assert all("{nickname}" in engine._text_value(item) for item in pool), \
+                "%s.%s 有文案缺少昵称" % (label, species)
+
+    routed = [
+        ("warn_light_duck", "野鸭", engine.SETTLER_WARN_LIGHT["野鸭"]),
+        ("warn_heavy_duck", "野鸭", engine.SETTLER_WARN_HEAVY["野鸭"]),
+        ("starve_duck", "野鸭", [engine.SETTLER_TEXT["野鸭"]["starve"]]),
+    ]
+    routed.extend(("hibernate", species, engine.SETTLER_HIBERNATE_TEXT[species])
+                  for species in engine.SETTLER_HIBERNATE_TEXT)
+    routed.extend(("wake", species, engine.SETTLER_WAKE_TEXT[species])
+                  for species in engine.SETTLER_WAKE_TEXT)
+    routed.extend(("grown_chron", species, [engine.SETTLER_GROWN_CHRON % species])
+                  for species in engine.SETTLER_GROWN_CHRON_NAMED)
+    routed.extend(("warn_light_chron", species,
+                   [engine.SETTLER_WARN_CHRON_LIGHT % species])
+                  for species in engine.SETTLER_WARN_CHRON_LIGHT_NAMED)
+    routed.extend(("warn_heavy_chron", species,
+                   [engine.SETTLER_WARN_CHRON_HEAVY % species])
+                  for species in engine.SETTLER_WARN_CHRON_HEAVY_NAMED)
+    for label, species, unnamed_pool in routed:
+        named_pool = pools[label][species]
+        for turn in range(len(named_pool)):
+            unnamed_state, unnamed = state_for(species, turn=turn)
+            named_state, named = state_for(species, NICKNAME, turn=turn)
+            actual_unnamed = engine._pick_settler_text(
+                unnamed_state, None, unnamed, unnamed_pool, named_pool, mode="turn")
+            actual_named = engine._pick_settler_text(
+                named_state, None, named, unnamed_pool, named_pool, mode="turn")
+            expected_unnamed = engine._weather_texts(unnamed_state, unnamed_pool)
+            expected_named = engine._weather_texts(named_state, named_pool)
+            assert actual_unnamed == expected_unnamed[turn % len(expected_unnamed)]
+            assert actual_named == expected_named[turn % len(expected_named)].format(
+                nickname=NICKNAME)
+
+    assert engine.SETTLER_GROWN_CHRON == "那只幼年的%s长成了，开始独自在池塘讨生活。"
+    assert engine.SETTLER_WARN_CHRON_LIGHT == "%s 开始吃不饱了。"
+    assert engine.SETTLER_WARN_CHRON_HEAVY == "%s 濒临饿死，命悬一线。"
+
+    parts = {
+        "翠鸟": ("羽", "喙", "肋骨"),
+        "苍鹭": ("羽", "喙", "肋骨"),
+        "野鸭": ("羽", "喙", "肋骨"),
+        "水蛇": ("鳞", "嘴", "身条"),
+        "流浪乌龟": ("壳", "嘴", "壳沿"),
+        "螃蟹": ("壳", "嘴", "壳沿"),
+    }
+    for species, (cover, mouth, outline) in parts.items():
+        assert engine.SETTLER_GROWN_CHRON_NAMED[species] == [
+            "{nickname}的个头够了。%s上的纹路长齐了。" % cover,
+            "{nickname}不再跟在别的影子后面了。它自己就是一道完整的影子。",
+        ]
+        assert engine.SETTLER_WARN_CHRON_LIGHT_NAMED[species] == [
+            "{nickname}开始花更多时间盯住水面。%s探下去的次数多了，抬上来的动静少了。" % mouth,
+            "{nickname}的觅食时间拉长了。水面留下的细纹比从前密，但搅起的泥星很少。",
+        ]
+        assert engine.SETTLER_WARN_CHRON_HEAVY_NAMED[species] == [
+            "{nickname}的%s显出来了。它还在觅食，只是动作越来越慢。" % outline,
+            "{nickname}把剩下的力气都用在了水边。但水里能回应它的东西不多了。",
+        ]
+    for group in (engine.SETTLER_GROWN_CHRON_NAMED,
+                  engine.SETTLER_WARN_CHRON_LIGHT_NAMED,
+                  engine.SETTLER_WARN_CHRON_HEAVY_NAMED):
+        for pool in group.values():
+            assert all("/" not in engine._text_value(item) for item in pool)
+
+    for item in engine.SETTLER_LEAVE_NAMED["野鸭"]["starve"]:
+        body = engine._text_value(item).format(nickname=NICKNAME)
+        assert engine._classify_event("settler_leave:" + body)["name"] == "野鸭离开"
+    for group in (engine.SETTLER_HIBERNATE_TEXT_NAMED,
+                  engine.SETTLER_WAKE_TEXT_NAMED):
+        for pool in group.values():
+            for item in pool:
+                body = engine._text_value(item).format(nickname=NICKNAME)
+                assert "定居者" not in engine._classify_event("settler:" + body)["name"]
+
+    return sum(sum(counts.values()) for counts in expected_counts.values())
 
 
 def stocked_state(named):
@@ -210,9 +327,11 @@ def verify_parallel_days():
 def main():
     selected = verify_selected_pools()
     static = static_cases()
+    expanded = verify_expanded_named_pools()
     verify_observe_ambient()
     verify_parallel_days()
     print("named/unnamed pool routes: PASS (%d selected + %d static pools)" % (selected, static))
+    print("expanded named pools/body-part split: PASS (%d templates checked)" % expanded)
     print("observe same-species ambiguity fallback: PASS")
     print("30-day named/unnamed rng_state alignment: PASS")
 
