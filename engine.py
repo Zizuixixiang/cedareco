@@ -281,6 +281,13 @@ SETTLER_TYPES = {
             "brood_food": {"鲫鱼": 1, "泥鳅": 1}, "juvenile_days": 25, "max_count": 3},
 }
 
+SETTLER_RETURN_BASE_PROB = 0.5
+SETTLER_RETURN_DECAY_DAYS = 300.0
+SETTLER_RETURN_MIN_PROB = 0.05
+SETTLER_RETURN_MAX_PROB = 0.5
+SETTLER_DESCENDANT_PROB = 0.15
+SETTLER_DESCENDANT_WINDOW_DAYS = 120
+
 # 定居者延迟因果暗示：定居满 N 天时，在某次 observe 末尾追加一句一次性描写。
 # SETTLER_HINT_DAYS：触发天数（定居者 age 达到该值且未触发过时出现）。
 SETTLER_HINT_DAYS = {
@@ -383,6 +390,89 @@ SETTLER_TEXT = {
         "age_chron": "老苍鹭在冬日的巢边静卧而去。",
     },
 }
+
+SETTLER_RETURN_TEXT = {
+    "翠鸟": [
+        "{nickname}落在旧枝上，偏头看了看水面。那道蓝影比记忆中轻了些。",
+        "枯枝颤了一下。{nickname}甩掉羽尖的水，嘴里叼着什么在扭动。",
+        "{nickname}又站在那个位置了。风从同一个方向来，羽被吹起的角度和从前一样。",
+        "蓝影落在枯枝上。那根枝，它站过的。",
+    ],
+    "苍鹭": [
+        "{nickname}单腿立在浅水处，喙慢慢低下去。还是那个位置，还是那么慢。",
+        "水面没过{nickname}的细腿，不深不浅。它定住不动，像从没离开过。",
+        "{nickname}从苇丛后探出头，颈子弯出熟悉的弧度。水里的影子长长地拖在后面。",
+        "浅水边多了道长腿的影子。它还在老地方等着。",
+    ],
+    "水蛇": [
+        "{nickname}从石缝里探出半个头，吐信子的节奏和从前一样。",
+        "水面划开一道细纹。{nickname}游过的路径，和记忆里那条分毫不差。",
+        "{nickname}缠上那根旧水草，一圈一圈绕上去。力道很轻，很熟。",
+        "石缝深处有什么滑了出来。水纹荡开的形状，有些眼熟。",
+    ],
+    "流浪乌龟": [
+        "{nickname}爬上那块石头，四只脚找到旧日的凹陷。刚好扣进去。",
+        "那块石头上又多了个壳。{nickname}伸长脖子，朝向去年晒背的方向。",
+        "{nickname}趴下的时候，石头上的老印子还在。壳沿对得很齐。",
+        "石头上壳的影子又出现了。四只脚撑在旧坑里，一动不动。",
+    ],
+    "野鸭": [
+        "{nickname}落水的弧度还是那样，胸先着，溅起一小圈水花。",
+        "水面浮起几道涟漪。{nickname}把喙埋进翅膀，埋的那一侧没变过。",
+        "{nickname}带着一串水痕游过来，转弯的位置和去年一模一样。",
+        "水面多了几圈波纹，聚集的位置很熟悉。",
+    ],
+    "螃蟹": [
+        "{nickname}横着走过那片泥沙，步足踩出的孔和旧孔叠在一起。",
+        "岸边那个洞口有动静。{nickname}侧身挤出来，大小还是刚好。",
+        "{nickname}举着螯在水边停了一下，然后横着滑进水里。路线没变。",
+        "沙地上多了一行浅孔，孔距很熟悉。",
+    ],
+}
+
+SETTLER_DESCENDANT_TEXT = {
+    "翠鸟": [
+        "新来的蓝影扎水的动作很快，但离水时溅起的水花多了些。羽色淡了一点。",
+        "枯枝上站着一只翠鸟，偏头的角度像极了从前那道影子。只是爪尖攥得还不够紧。",
+        "那道蓝影在枝头调整了几次才站稳。身形瘦些，眼里的东西还新鲜。",
+    ],
+    "苍鹭": [
+        "浅水处的细腿还有些晃，定住不动的时间短了些。颈子弯得不够深。",
+        "苇丛后的那道灰影等了一会儿就动了。太急了，水下的鱼还在观察。",
+        "单腿站立的姿势学得很像，只是换腿太勤了些。风来的时候，羽还没学会保持不动。",
+    ],
+    "水蛇": [
+        "从石缝钻出的那截身子，鳞片亮得过分。游过水草时绕错了方向，又退回来。",
+        "吐信子的频率快了些。水底的路线大致是对的，但在某处犹豫了一下。",
+        "缠上旧水草的姿势很接近了，只是圈数多绕了一道。力道还有些试探。",
+    ],
+    "流浪乌龟": [
+        "爬上石头花了更长时间，壳的边缘还没磨圆。趴下时，和旧印子之间有条细缝。",
+        "那块石头上多了个壳，比记忆里的小一圈。伸长脖子的角度不够，还在找。",
+        "四只脚在石头上试了几处才停住。旧坑还在，只是壳还填不满。",
+    ],
+    "野鸭": [
+        "落水的声响比从前大了些。胸着水面的时候，翅膀没收到位。",
+        "水面浮起的涟漪还是那样的圈数，只是把喙埋进翅膀时，埋错了方向。",
+        "转弯时水痕断了一下。弧度还在学，尾巴翘得太高了。",
+    ],
+    "螃蟹": [
+        "步足踩出的孔和旧孔挨得很近，但没完全叠上。横着走的速度快了些。",
+        "从洞口侧身挤出来时卡了一下。壳还太新，边缘太齐。",
+        "举螯的姿势是对了，但停在水边的瞬间不够长。入水时水花太大了些。",
+    ],
+}
+
+SETTLER_RETURN_NOTES_NAMED = [
+    "第{day}天，{nickname}重新出现在池塘。",
+    "第{day}天，{nickname}的身影又落回了老地方。",
+]
+SETTLER_RETURN_NOTE_UNNAMED = "第{day}天，它回来了。"
+SETTLER_DESCENDANT_NOTES = [
+    "新来的那位，有些像{ancestor}。",
+    "它的动作里，藏着另一只的影子。",
+    "池塘认得这个轮廓。只是细节还不对。",
+]
 
 # 翠鸟定居者捕食成功 / 失败文案（各 5 套）
 KINGFISHER_HIT = [
@@ -1562,6 +1652,10 @@ ACHIEVEMENTS = {
     "龟去来兮": "流浪乌龟离开累计3次",
     "嘎然而止": "野鸭离开累计3次",
     "蟹蟹再见": "螃蟹离开累计3次",
+    "如期而至": "旧影落回老地方。",
+    "回头客": "第三次旧影归位。",
+    "宾至如归": "六种故人都来过。",
+    "旧巢新燕": "新来的那位，动作很像。",
     "🍊特供 · 蛇我而去": "纪念静静与面条，感谢你发现了水蛇冬眠的Bug。",
 }
 
@@ -1750,6 +1844,74 @@ def _migrate(state):
     state.setdefault("history", [])
     for s in state.get("settlers", []):
         s.setdefault("arrive_day", max(0, state["turn"] - s.get("age", 0)))
+        s.setdefault("return_records", [])
+        s.setdefault("descendant_of", None)
+    _migrate_settler_residents(state)
+
+
+def _settler_reason_code(reason):
+    if reason in ("food", "starve"):
+        return "food"
+    if reason in ("old_age", "age"):
+        return "old_age"
+    return reason or "other"
+
+
+def _parse_legacy_settler_leave(state, species):
+    txt = SETTLER_TEXT.get(species, {})
+    patterns = []
+    for reason, keys in (("food", ("starve_chron", "starve")),
+                         ("old_age", ("age_chron", "age"))):
+        for key in keys:
+            body = txt.get(key)
+            if body:
+                patterns.append((body, reason))
+    hits = []
+    for entry in state.get("chronicle", []) + state.get("key_chronicle", []):
+        m = re.search(r"第(\d+)天：(.*)$", entry)
+        if not m:
+            continue
+        day = int(m.group(1))
+        body = m.group(2).strip()
+        for text, reason in patterns:
+            if body == text:
+                hits.append((day, reason))
+                break
+    hits.sort(key=lambda x: x[0])
+    return hits
+
+
+def _migrate_settler_residents(state):
+    folio = state.get("folio", {}).get("settlers", {})
+    for species, rec in folio.items():
+        rec.setdefault("residents", [])
+        parsed = _parse_legacy_settler_leave(state, species)
+        used = 0
+        for life in rec.get("residents", []):
+            life.setdefault("name", species)
+            life.setdefault("species", life.get("name", species))
+            if life.get("nickname") == "":
+                life["nickname"] = None
+            if life.get("leave_day") is None and used < len(parsed):
+                life["leave_day"], life["reason"] = parsed[used]
+                used += 1
+            elif life.get("reason") is None and life.get("leave_day") is not None:
+                match = next((p for p in parsed if p[0] == life.get("leave_day")), None)
+                if match:
+                    life["reason"] = match[1]
+            life["reason"] = _settler_reason_code(life.get("reason"))
+            if "leave_age" not in life and "age" in life:
+                life["leave_age"] = life.get("age")
+            if "age" not in life and "leave_age" in life:
+                life["age"] = life.get("leave_age")
+            if life.get("leave_day") is None:
+                life["return_eligible"] = False
+            elif life.get("reason") == "food" and life.get("leave_age") is not None:
+                life.setdefault("return_eligible", True)
+            else:
+                life["return_eligible"] = False
+            life.setdefault("return_records", [])
+            life.setdefault("descendant_of", None)
 
 
 def rng_from(state):
@@ -3461,6 +3623,8 @@ def _new_settler_dict(name, juvenile=False, state=None, origin="arrived"):
         "arrive_season": season,
         "origin": origin,
         "hibernations": [],
+        "return_records": [],
+        "descendant_of": None,
     }
 
 
@@ -3472,14 +3636,20 @@ def _settler_archive_rec(state, name):
 
 def _archive_settler_life(state, s, reason):
     rec = _settler_archive_rec(state, s["name"])
+    leave_age = s.get("age", 0)
     life = {
         "name": s["name"],
+        "species": s["name"],
         "nickname": s.get("nickname"),
         "origin": s.get("origin", "arrived"),
         "arrive_day": s.get("arrive_day", max(0, state["turn"] - s.get("age", 0))),
         "leave_day": state["turn"],
-        "age": s.get("age", 0),
-        "reason": reason,
+        "age": leave_age,
+        "leave_age": leave_age,
+        "reason": _settler_reason_code(reason),
+        "return_eligible": _settler_reason_code(reason) == "food",
+        "return_records": list(s.get("return_records", [])),
+        "descendant_of": s.get("descendant_of"),
     }
     hibs = s.get("hibernations") or []
     if hibs:
@@ -3493,18 +3663,156 @@ def _archive_settler_life(state, s, reason):
 SETTLER_SPECIES = {"水蛇", "流浪乌龟", "螃蟹", "野鸭", "翠鸟", "苍鹭"}
 
 
-def _add_settler(state, name):
+# 归巢日：截止日（含当日，Asia/Shanghai）内回归概率拉满，过期自动回落常规概率。
+SETTLER_RETURN_BOOST_UNTIL = "2026-07-10"
+
+
+def _return_boost_active():
+    try:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        return datetime.now(ZoneInfo("Asia/Shanghai")).strftime("%Y-%m-%d") <= SETTLER_RETURN_BOOST_UNTIL
+    except Exception:
+        return False
+
+
+def _return_probability(days_away):
+    if _return_boost_active():
+        return 1.0
+    p = SETTLER_RETURN_BASE_PROB - (float(days_away) / SETTLER_RETURN_DECAY_DAYS)
+    return _clamp(p, SETTLER_RETURN_MIN_PROB, SETTLER_RETURN_MAX_PROB)
+
+
+def _eligible_return_lives(state, name):
+    rec = _settler_archive_rec(state, name)
+    max_age = SETTLER_TYPES[name]["max_age"]
+    out = []
+    for idx, life in enumerate(rec.get("residents", [])):
+        if not life.get("return_eligible"):
+            continue
+        if life.get("reason") != "food":
+            continue
+        leave_day = life.get("leave_day")
+        leave_age = life.get("leave_age", life.get("age"))
+        if leave_day is None or leave_age is None:
+            continue
+        days_away = max(0, state["turn"] - leave_day)
+        if leave_age + days_away <= max_age:
+            out.append((idx, life, days_away))
+    out.sort(key=lambda x: (x[2], -(x[1].get("leave_day") or 0)))
+    return out
+
+
+def _pick_return_text(r, name, nickname):
+    pool = SETTLER_RETURN_TEXT.get(name, [])
+    if not pool:
+        return "%s 回到了池塘。" % (nickname or name)
+    if nickname:
+        choices = [t for t in pool if "{nickname}" in t] or pool
+        return _pick(r, choices).format(nickname=nickname)
+    return pool[-1]
+
+
+def _pick_return_note(r, nickname, day):
+    if nickname:
+        return _pick(r, SETTLER_RETURN_NOTES_NAMED).format(day=day, nickname=nickname)
+    return SETTLER_RETURN_NOTE_UNNAMED.format(day=day)
+
+
+def _returning_settler(state, name, r):
+    for _idx, life, days_away in _eligible_return_lives(state, name):
+        if not r.chance(_return_probability(days_away)):
+            continue
+        s = _new_settler_dict(name, juvenile=False, state=state, origin="returned")
+        s["nickname"] = life.get("nickname")
+        leave_age = life.get("leave_age", life.get("age", 0)) or 0
+        s["age"] = leave_age + days_away
+        s["return_from"] = {
+            "arrive_day": life.get("arrive_day"),
+            "leave_day": life.get("leave_day"),
+            "leave_age": leave_age,
+        }
+        record = {"day": state["turn"], "after_days": days_away, "from_leave_day": life.get("leave_day")}
+        s.setdefault("return_records", []).append(record)
+        life.setdefault("return_records", []).append(record)
+        life["returned_day"] = state["turn"]
+        life["return_eligible"] = False
+        return s, life, _pick_return_text(r, name, s.get("nickname")), _pick_return_note(r, s.get("nickname"), state["turn"])
+    return None, None, None, None
+
+
+def _eligible_descendant_lives(state, name):
+    rec = _settler_archive_rec(state, name)
+    out = []
+    for life in rec.get("residents", []):
+        if life.get("reason") != "old_age" or not life.get("nickname"):
+            continue
+        leave_day = life.get("leave_day")
+        if leave_day is None:
+            continue
+        days = state["turn"] - leave_day
+        if 0 <= days <= SETTLER_DESCENDANT_WINDOW_DAYS:
+            out.append((days, life))
+    out.sort(key=lambda x: (x[0], -(x[1].get("leave_day") or 0)))
+    return out
+
+
+def _descendant_marker(state, name, r):
+    lives = _eligible_descendant_lives(state, name)
+    if not lives or not r.chance(SETTLER_DESCENDANT_PROB):
+        return None, None, None
+    life = lives[0][1]
+    ancestor = life.get("nickname")
+    text = _pick(r, SETTLER_DESCENDANT_TEXT.get(name, []))
+    note = _pick(r, SETTLER_DESCENDANT_NOTES).format(ancestor=ancestor)
+    return {"species": name, "ancestor": ancestor, "ancestor_leave_day": life.get("leave_day")}, text, note
+
+
+def _record_settler_return_achievements(state, events, name):
+    counts = state.setdefault("settler_return_count", {})
+    counts[name] = counts.get(name, 0) + 1
+    total = sum(counts.values())
+    if total >= 1:
+        _unlock(state, events, "如期而至")
+    if total >= 3:
+        _unlock(state, events, "回头客")
+    if all(counts.get(n, 0) > 0 for n in SETTLER_SPECIES):
+        _unlock(state, events, "宾至如归")
+
+
+def _add_settler(state, name, events=None, r=None):
     """收留一名定居者，加入列表并登记定居者志。"""
     t = SETTLER_TYPES[name]
-    state["settlers"].append(_new_settler_dict(name, juvenile=False, state=state, origin="arrived"))
+    events = events if events is not None else []
+    local_rng = r is None
+    r = r or rng_from(state)
+    settler, _life, special_text, note = _returning_settler(state, name, r)
+    descendant = None
+    if settler is None:
+        settler = _new_settler_dict(name, juvenile=False, state=state, origin="arrived")
+        descendant, special_text, note = _descendant_marker(state, name, r)
+        if descendant:
+            settler["descendant_of"] = descendant
+    state["settlers"].append(settler)
     rec = _settler_archive_rec(state, name)
     rec["times"] += 1
     # 定居时设置的永久标记（如苍鹭定居→鱼群学会躲藏）
     flag = t.get("on_settle_flag")
     if flag:
         state["flags"][flag] = True
-    txt = SETTLER_TEXT.get(name, {})
-    _chronicle(state, txt.get("arrive_chron", "%s 住了下来，成为池塘的一部分。" % name))
+    if settler.get("origin") == "returned":
+        events.append("settler_return:" + special_text)
+        _chronicle(state, note)
+        _record_settler_return_achievements(state, events, name)
+    elif descendant:
+        events.append("settler_descendant:" + special_text)
+        _chronicle(state, note)
+        _unlock(state, events, "旧巢新燕")
+    else:
+        txt = SETTLER_TEXT.get(name, {})
+        _chronicle(state, txt.get("arrive_chron", "%s 住了下来，成为池塘的一部分。" % name))
+    if local_rng:
+        commit_rng(state, r)
 
 
 # 捕食型定居者的（成功, 失败-猎物在场, 扑空-猎物不在）文案
@@ -3969,11 +4277,11 @@ def _process_settlers(state, events, r):
         if s["health"] <= 0:
             leave = txt.get("starve", "%s 找不到食物，离开了池塘。" % name)
             leave_chron = txt.get("starve_chron", leave)
-            leave_reason = "starve"
+            leave_reason = "food"
         elif s["age"] > s["max_age"]:
             leave = txt.get("age", "年迈的%s悄然离去。" % name)
             leave_chron = txt.get("age_chron", leave)
-            leave_reason = "age"
+            leave_reason = "old_age"
         # 冬季翠鸟：离开改用冬季专属文案（年鉴仍按原因记录）
         if leave and season == "冬" and name == "翠鸟":
             leave = _pick(r, KINGFISHER_WINTER_LEAVE)
@@ -4138,7 +4446,7 @@ def _resolve_choice(state, pc, idx, events):
         elif idx == 3:
             # 第三选项：保持距离观察 → 水蛇定居
             was_pair = _settler_count(state, "水蛇") == 1
-            _add_settler(state, "水蛇")
+            _add_settler(state, "水蛇", events)
             msg = (_pair_settle_text(state, was_pair, "水蛇") or
                    "你决定保持距离。水蛇继续盘在芦苇间，偶尔滑入水中，带起一道细长的波纹。"
                    "它成了池塘里最安静的住客。")
@@ -4157,7 +4465,7 @@ def _resolve_choice(state, pc, idx, events):
     elif key == "流浪乌龟":
         if idx == 1:
             was_pair = _settler_count(state, "流浪乌龟") == 1
-            _add_settler(state, "流浪乌龟")
+            _add_settler(state, "流浪乌龟", events)
             state["flags"]["turtle_resident"] = True
             _unlock(state, events, "不速之客")
             msg = (_pair_settle_text(state, was_pair, "流浪乌龟") or
@@ -4250,7 +4558,7 @@ def _resolve_choice(state, pc, idx, events):
     elif key == "螃蟹":
         if idx == 1:
             was_pair = _settler_count(state, "螃蟹") == 1
-            _add_settler(state, "螃蟹")
+            _add_settler(state, "螃蟹", events)
             msg = (_pair_settle_text(state, was_pair, "螃蟹") or
                    "你收留了这只螃蟹。它横着爬进池塘，钳子夹住一块石头，在底下安了家。")
         else:
@@ -4258,7 +4566,7 @@ def _resolve_choice(state, pc, idx, events):
     elif key == "野鸭":
         if idx == 1:
             was_pair = _settler_count(state, "野鸭") == 1
-            _add_settler(state, "野鸭")
+            _add_settler(state, "野鸭", events)
             msg = (_pair_settle_text(state, was_pair, "野鸭") or
                    "你欢迎了这只野鸭。它在芦苇丛边停下，开始把水面当成自己的领地。")
         else:
@@ -4266,7 +4574,7 @@ def _resolve_choice(state, pc, idx, events):
     elif key == "翠鸟定居":
         if idx == 1:
             was_pair = _settler_count(state, "翠鸟") == 1
-            _add_settler(state, "翠鸟")
+            _add_settler(state, "翠鸟", events)
             msg = (_pair_settle_text(state, was_pair, "翠鸟") or
                    "你默许了。翠鸟衔来第一根细枝，搭在枯枝的弯处。从此池塘多了一道蓝影，不只是过客。")
         else:
@@ -4274,7 +4582,7 @@ def _resolve_choice(state, pc, idx, events):
     elif key == "苍鹭定居":
         if idx == 1:
             was_pair = _settler_count(state, "苍鹭") == 1
-            _add_settler(state, "苍鹭")  # 内部会设置 heron_resident 永久标记
+            _add_settler(state, "苍鹭", events)  # 内部会设置 heron_resident 永久标记
             msg = (_pair_settle_text(state, was_pair, "苍鹭") or
                    "你欢迎了它。苍鹭继续衔枝，在岸边搭起一个粗糙的巢。它成了池塘最从容的住客。")
         else:
@@ -4297,7 +4605,7 @@ def _resolve_choice(state, pc, idx, events):
         if idx == 1:
             was_pair = _settler_count(state, "螃蟹") == 1
             if _can_invite_settler(state, "螃蟹"):
-                _add_settler(state, "螃蟹")
+                _add_settler(state, "螃蟹", events)
             state["flags"]["apple_snail"] = {"status": "clearing", "leave_day": state["turn"] + 3}
             msg = (_pair_settle_text(state, was_pair, "螃蟹") or
                    _pick_t(state, DISASTER_TEXT["福寿螺入侵"]["crab"]))
@@ -4741,9 +5049,9 @@ def _settler_life_name(life):
 
 
 def _settler_leave_reason(reason):
-    if reason == "starve":
+    if reason in ("food", "starve"):
         return "因食物不足离开"
-    if reason == "age":
+    if reason in ("old_age", "age"):
         return "在年老后离去"
     return "离开"
 
@@ -5064,6 +5372,7 @@ EVENT_ICONS = {
     "crisis": "⚠️", "lifecycle": "🦋", "spawn": "🥚", "achievement": "🏆",
     "discover": "🔎", "choice": "❓", "choice_auto": "⌛", "settler": "🐢",
     "settler_hunt": "🐟", "settler_miss": "💨", "settler_leave": "🚪",
+    "settler_return": "↩", "settler_descendant": "🐣",
     "settler_winter": "❄", "settler_interact": "👀",
     "settler_birth": "🐣", "settler_grown": "🐣", "weather": "🌫", "report": "📅", "disease": "🦠",
     "recovery": "🌱", "eutrophication": "🟢",
@@ -5213,6 +5522,14 @@ def _classify_event(ev):
             who = "翠鸟" if body in KINGFISHER_WINTER_LEAVE else "定居者"
         meta["name"] = who + "离开"
         meta["effect"] = "离开池塘"
+    elif tag == "settler_return":
+        who = next((n for n in SETTLER_TYPES if n in body), "定居者")
+        meta["name"] = who + "回归"
+        meta["effect"] = "旧住户归来"
+    elif tag == "settler_descendant":
+        who = next((n for n in SETTLER_TYPES if n in body), "定居者")
+        meta["name"] = who + "之后"
+        meta["effect"] = "故人之后"
     elif tag == "settler_winter":
         meta["name"] = "翠鸟越冬"
         meta["effect"] = ""
@@ -6159,10 +6476,14 @@ def _cmd_folio(state):
             residents = list(rec.get("residents", []))
             current = [{
                 "name": s.get("name"),
+                "species": s.get("name"),
                 "nickname": s.get("nickname"),
                 "arrive_day": s.get("arrive_day", max(0, state["turn"] - s.get("age", 0))),
                 "leave_day": None,
                 "hibernations": s.get("hibernations", []),
+                "origin": s.get("origin", "arrived"),
+                "return_records": list(s.get("return_records", [])),
+                "descendant_of": s.get("descendant_of"),
             } for s in here]
             shown = [resident_index(x) for x in residents[-3:]]
             shown.extend(resident_index(x, live=True) for x in current[:2])
@@ -6287,6 +6608,9 @@ def api_state(state):
             "status": status,
             "health": _health_word(s.get("health", 0)),
             "health_value": round(s.get("health", 0), 3),
+            "origin": s.get("origin", "arrived"),
+            "return_records": list(s.get("return_records", [])),
+            "descendant_of": s.get("descendant_of"),
         })
     hy = state.get("flags", {}).get("water_hyacinth")
     water_hyacinth_cover = None
@@ -6405,10 +6729,14 @@ def api_folio(state):
         residents = list(rec.get("residents", []))
         residents.extend({
             "name": s.get("name"),
+            "species": s.get("name"),
             "nickname": s.get("nickname"),
             "arrive_day": s.get("arrive_day", max(0, state["turn"] - s.get("age", 0))),
             "leave_day": None,
             "hibernations": s.get("hibernations", []),
+            "origin": s.get("origin", "arrived"),
+            "return_records": list(s.get("return_records", [])),
+            "descendant_of": s.get("descendant_of"),
         } for s in here)
         settlers.append({
             "species": name,
@@ -6419,6 +6747,9 @@ def api_folio(state):
                     "label": _settler_label(s),
                     "age": s.get("age", 0),
                     "health": _health_word(s.get("health", 0)),
+                    "origin": s.get("origin", "arrived"),
+                    "return_records": list(s.get("return_records", [])),
+                    "descendant_of": s.get("descendant_of"),
                 }
                 for s in here
             ],
@@ -6669,8 +7000,11 @@ def _lite_snapshot(state):
         "folio": {
             "species": {n: [e.get("first_day"), e.get("extinct_count", 0)]
                         for n, e in cod["species"].items()},
-            "settlers": {n: [r.get("times", 0), r.get("max_days", 0)]
-                         for n, r in cod["settlers"].items()},
+            "settlers": {n: {
+                "times": r.get("times", 0),
+                "max_days": r.get("max_days", 0),
+                "residents": list(r.get("residents", [])),
+            } for n, r in cod["settlers"].items()},
             "visitors": {n: r.get("count", 0) for n, r in cod["visitors"].items()},
             "events": {n: r.get("count", 0) for n, r in cod["events"].items()},
             "disasters": {n: [r.get("count", 0), r.get("first_day"), r.get("days", [])]
@@ -6717,8 +7051,16 @@ def _restore_from_lite(data):
             "extinct_count": p[1] if len(p) > 1 else 0,
             "alive": base["populations"].get(n, 0) >= 1}
         for n, p in fs.get("species", {}).items()}
-    base["folio"]["settlers"] = {n: {"times": p[0], "max_days": p[1]}
-                                 for n, p in fs.get("settlers", {}).items()}
+    base["folio"]["settlers"] = {}
+    for n, p in fs.get("settlers", {}).items():
+        if isinstance(p, dict):
+            base["folio"]["settlers"][n] = {
+                "times": p.get("times", 0),
+                "max_days": p.get("max_days", 0),
+                "residents": list(p.get("residents", [])),
+            }
+        else:
+            base["folio"]["settlers"][n] = {"times": p[0], "max_days": p[1], "residents": []}
     base["folio"]["visitors"] = {n: {"count": c, "notes": []}
                                  for n, c in fs.get("visitors", {}).items()}
     base["folio"]["events"] = {n: {"count": c, "notes": []}
