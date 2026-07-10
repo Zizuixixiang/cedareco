@@ -6501,8 +6501,19 @@ def _cmd_folio(state):
         end = "至今" if live else life.get("leave_day")
         if start is not None and end is not None:
             span = "第%d天至今" % start if live else "第%d-%d天" % (start, end)
-            return "%s（%s）" % (label, span)
-        return label
+            rets = life.get("return_records") or []
+            span += "".join(
+                "、第%d天归来" % r.get("day")
+                for r in rets if isinstance(r, dict) and r.get("day") is not None)
+            text = "%s（%s）" % (label, span)
+        else:
+            text = label
+        anc = life.get("descendant_of")
+        if anc:
+            anc_name = anc.get("nickname") if isinstance(anc, dict) else anc
+            if anc_name:
+                text += "〔%s之后〕" % anc_name
+        return text
 
     # —— 定居者志 ——
     if cod["settlers"]:
