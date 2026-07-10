@@ -1743,6 +1743,8 @@ def fresh_state(seed):
         "pending_pause": None,       # wait 自动暂停原因
         # ---- v4：三层架构 / 解锁制 / 万物志 / 年鉴 ----
         "settlers": [],              # 定居者列表（个体）
+        "next_settler_id": 1,        # 下一个定居者稳定 ID（离塘/回归不变）
+        "breed_year": {},            # 定居者物种 -> 上次繁殖年份
         "unlocked_species": list(STARTER_SPECIES),   # 已解锁可召唤物种
         "max_seen": {},              # 各物种/碎屑历史最大值（解锁制判定）
         "folio": {                   # 万物志四本
@@ -1858,6 +1860,7 @@ def _migrate(state):
         s.setdefault("return_records", [])
         s.setdefault("descendant_of", None)
     _migrate_settler_residents(state)
+    _migrate_settler_kinship(state)
 
 
 def _settler_reason_code(reason):
@@ -1923,6 +1926,153 @@ def _migrate_settler_residents(state):
                 life["return_eligible"] = False
             life.setdefault("return_records", [])
             life.setdefault("descendant_of", None)
+
+
+def _settler_id_number(value):
+    if not isinstance(value, str):
+        return 0
+    match = re.fullmatch(r"S(\d+)", value)
+    return int(match.group(1)) if match else 0
+
+
+def _allocate_settler_id(state):
+    next_id = max(1, int(state.get("next_settler_id", 1)))
+    state["next_settler_id"] = next_id + 1
+    return "S%d" % next_id
+
+
+def _ensure_settler_id(state, settler):
+    settler_id = settler.get("settler_id")
+    if not settler_id:
+        settler_id = _allocate_settler_id(state)
+        settler["settler_id"] = settler_id
+    else:
+        state["next_settler_id"] = max(
+            int(state.get("next_settler_id", 1)),
+            _settler_id_number(settler_id) + 1,
+        )
+    return settler_id
+
+
+def _find_return_source_life(state, settler):
+    source = settler.get("return_from")
+    if not isinstance(source, dict):
+        return None
+    species = settler.get("name")
+    residents = state.get("folio", {}).get("settlers", {}).get(species, {}).get("residents", [])
+    matches = [
+        life for life in residents
+        if life.get("arrive_day") == source.get("arrive_day")
+        and life.get("leave_day") == source.get("leave_day")
+    ]
+    nickname = settler.get("nickname")
+    if nickname:
+        named = [life for life in matches if life.get("nickname") == nickname]
+        if named:
+            matches = named
+    return matches[-1] if matches else None
+
+
+def _find_descendant_ancestor(state, descendant):
+    marker = descendant.get("descendant_of")
+    if not isinstance(marker, dict):
+        return None
+    species = marker.get("species") or descendant.get("name")
+    residents = state.get("folio", {}).get("settlers", {}).get(species, {}).get("residents", [])
+    ancestor_id = marker.get("ancestor_id")
+    if ancestor_id:
+        return next((life for life in residents if life.get("settler_id") == ancestor_id), None)
+    matches = [
+        life for life in residents
+        if life.get("leave_day") == marker.get("ancestor_leave_day")
+        and life.get("nickname") == marker.get("ancestor")
+    ]
+    return matches[-1] if matches else None
+
+
+def _migrate_settler_kinship(state):
+    """为旧档补齐稳定个体 ID 和已知父母。
+
+    旧档的池塘二代没有保存父母，无法安全重建关系；它们继续保持
+    原有的“不参与繁殖”规则。能通过回归来源或故人之后标记识别的关系会被恢复。
+    """
+    records = []
+    for rec in state.get("folio", {}).get("settlers", {}).values():
+        records.extend(rec.get("residents", []))
+    records.extend(state.get("settlers", []))
+
+    max_seen_id = max((_settler_id_number(s.get("settler_id")) for s in records), default=0)
+    state["next_settler_id"] = max(int(state.get("next_settler_id", 1)), max_seen_id + 1)
+
+    # 先给历史档案分配 ID，当前回归者才能沿用来源 ID。
+    archived = records[:-len(state.get("settlers", []))] if state.get("settlers") else records
+    for life in archived:
+        _ensure_settler_id(state, life)
+        life.setdefault("parent_ids", [])
+        if "legacy_kinship_unknown" not in life:
+            life["legacy_kinship_unknown"] = life.get("origin") == "born" and not life["parent_ids"]
+
+    # 旧版回归者再次离塘后 origin 会变成 returned，需用回归记录找回
+    # 上一段生命，否则池塘二代可通过“离塘→回归→再离塘”洗掉亲缘。
+    for species, rec in state.get("folio", {}).get("settlers", {}).items():
+        residents = rec.get("residents", [])
+        for life in residents:
+            if life.get("origin") != "returned":
+                continue
+            return_records = [
+                record for record in (life.get("return_records") or [])
+                if isinstance(record, dict) and record.get("from_leave_day") is not None
+            ]
+            if not return_records:
+                continue
+            matching_arrival = [
+                record for record in return_records
+                if record.get("day") == life.get("arrive_day")
+            ]
+            source_record = (matching_arrival or return_records)[-1]
+            candidates = [
+                previous for previous in residents
+                if previous is not life
+                and previous.get("leave_day") == source_record.get("from_leave_day")
+            ]
+            nickname = life.get("nickname")
+            if nickname:
+                named = [previous for previous in candidates if previous.get("nickname") == nickname]
+                if named:
+                    candidates = named
+            if not candidates:
+                continue
+            previous = candidates[-1]
+            life["settler_id"] = _ensure_settler_id(state, previous)
+            if not life.get("parent_ids"):
+                life["parent_ids"] = list(previous.get("parent_ids", []))
+            if previous.get("legacy_kinship_unknown"):
+                life["legacy_kinship_unknown"] = True
+
+    for settler in state.get("settlers", []):
+        source = _find_return_source_life(state, settler) if settler.get("origin") == "returned" else None
+        if not settler.get("settler_id") and source:
+            settler["settler_id"] = source.get("settler_id")
+        _ensure_settler_id(state, settler)
+        if "parent_ids" not in settler:
+            settler["parent_ids"] = list(source.get("parent_ids", [])) if source else []
+        if "legacy_kinship_unknown" not in settler:
+            settler["legacy_kinship_unknown"] = (
+                bool(source.get("legacy_kinship_unknown")) if source
+                else settler.get("origin") == "born" and not settler["parent_ids"]
+            )
+
+    # 故人之后至少能恢复已知祖先；同一祖先的后来者会被视为同胞。
+    for settler in records:
+        ancestor = _find_descendant_ancestor(state, settler)
+        if not ancestor:
+            continue
+        ancestor_id = _ensure_settler_id(state, ancestor)
+        marker = settler.get("descendant_of")
+        marker["ancestor_id"] = ancestor_id
+        if not settler.get("parent_ids"):
+            settler["parent_ids"] = [ancestor_id]
+            settler["legacy_kinship_unknown"] = False
 
 
 def rng_from(state):
@@ -3268,10 +3418,51 @@ def _settler_count(state, name):
     return sum(1 for s in state.get("settlers", []) if s["name"] == name)
 
 
+def _settler_pair_compatible(first, second, mature_only=True):
+    """两位同物种定居者是否可作为繁殖配偶。"""
+    if first is second or first.get("name") != second.get("name"):
+        return False
+    if mature_only and (first.get("juvenile") or second.get("juvenile")):
+        return False
+    if first.get("legacy_kinship_unknown") or second.get("legacy_kinship_unknown"):
+        return False
+    first_id = first.get("settler_id")
+    second_id = second.get("settler_id")
+    if not first_id or not second_id or first_id == second_id:
+        return False
+    first_parents = set(first.get("parent_ids") or [])
+    second_parents = set(second.get("parent_ids") or [])
+    # 亲子，以及同父/同母的亲兄弟、半兄弟都不能繁殖。
+    if first_id in second_parents or second_id in first_parents:
+        return False
+    if first_parents.intersection(second_parents):
+        return False
+    return True
+
+
+def _compatible_settler_pairs(settlers, name, mature_only=True):
+    same_species = [s for s in settlers if s.get("name") == name]
+    pairs = []
+    for idx, first in enumerate(same_species):
+        for second in same_species[idx + 1:]:
+            if _settler_pair_compatible(first, second, mature_only=mature_only):
+                pairs.append((first, second))
+    return pairs
+
+
 def _can_invite_settler(state, name):
-    """External visits only help a settler species form a pair; growth beyond that is breeding."""
+    """外来访客只用来建立一对无近亲关系的定居者，且不突破物种上限。"""
     cap = SETTLER_TYPES.get(name, {}).get("max_count", 2)
-    return _settler_count(state, name) < min(2, cap)
+    count = _settler_count(state, name)
+    if count >= cap:
+        return False
+    if count < 2:
+        return True
+    # 两只以上却全是近亲时，允许再来一位无亲缘访客；
+    # 已有潜在兼容配偶（包括尚未长成的幼体）就停止外来补充。
+    return not _compatible_settler_pairs(
+        state.get("settlers", []), name, mature_only=False
+    )
 
 
 PAIR_CHOICE_DESC = {
@@ -3525,6 +3716,15 @@ def _folio_bump(state, book, key, note=None):
     d["count"] += 1
     if note and note not in d["notes"]:
         d["notes"].append(note)
+    return d["count"]
+
+
+def _folio_note(state, book, key, note=None):
+    """只补充访客志/事件志说明，不增加次数。"""
+    d = state["folio"][book].setdefault(key, {"count": 0, "notes": []})
+    if note and note not in d["notes"]:
+        d["notes"].append(note)
+    return d["count"]
 
 
 def _update_max_seen(state):
@@ -3621,10 +3821,12 @@ def _natural_recovery(state, events, r):
             _chronicle(state, "%s 自然恢复" % name)
 
 
-def _new_settler_dict(name, juvenile=False, state=None, origin="arrived"):
+def _new_settler_dict(name, juvenile=False, state=None, origin="arrived",
+                      settler_id=None, parent_ids=None):
     t = SETTLER_TYPES[name]
     turn = state["turn"] if state else 0
     season = state["season"] if state else None
+    parents = list(dict.fromkeys(parent_ids or []))
     return {
         "name": name, "nickname": None, "age": 0, "health": 1.0,
         "max_age": t["max_age"], "daily_food": dict(t.get("daily_food", {})),
@@ -3638,6 +3840,10 @@ def _new_settler_dict(name, juvenile=False, state=None, origin="arrived"):
         "hibernations": [],
         "return_records": [],
         "descendant_of": None,
+        "settler_id": settler_id or (_allocate_settler_id(state) if state else None),
+        "parent_ids": parents,
+        # 只对无法重建父母的旧档 born 个体生效；新生幼体总会带 parent_ids。
+        "legacy_kinship_unknown": origin == "born" and not parents,
     }
 
 
@@ -3648,6 +3854,7 @@ def _settler_archive_rec(state, name):
 
 
 def _archive_settler_life(state, s, reason):
+    _ensure_settler_id(state, s)
     rec = _settler_archive_rec(state, s["name"])
     leave_age = s.get("age", 0)
     life = {
@@ -3663,6 +3870,10 @@ def _archive_settler_life(state, s, reason):
         "return_eligible": _settler_reason_code(reason) == "food",
         "return_records": list(s.get("return_records", [])),
         "descendant_of": s.get("descendant_of"),
+        "return_from": s.get("return_from"),
+        "settler_id": s.get("settler_id"),
+        "parent_ids": list(s.get("parent_ids", [])),
+        "legacy_kinship_unknown": bool(s.get("legacy_kinship_unknown")),
     }
     hibs = s.get("hibernations") or []
     if hibs:
@@ -3699,11 +3910,42 @@ def _return_probability(days_away):
 def _eligible_return_lives(state, name):
     rec = _settler_archive_rec(state, name)
     max_age = SETTLER_TYPES[name]["max_age"]
+    returned_sources = set()
+    present_nicknames = set()
+    present_return_records = set()
+    for settler in state.get("settlers", []):
+        if settler.get("name") != name:
+            continue
+        source = settler.get("return_from") or {}
+        source_key = (source.get("arrive_day"), source.get("leave_day"))
+        if source_key[1] is not None:
+            returned_sources.add(source_key)
+        if settler.get("nickname"):
+            # 旧档可能缺少 origin/return_from；同物种同昵称已在塘时，宁可把旧候选
+            # 视为同一个体，也不能再次生成一个同名回归者。
+            present_nicknames.add(settler["nickname"])
+        for record in settler.get("return_records") or []:
+            if isinstance(record, dict):
+                present_return_records.add((record.get("day"), record.get("from_leave_day")))
+
     out = []
     for idx, life in enumerate(rec.get("residents", [])):
         if not life.get("return_eligible"):
             continue
         if life.get("reason") != "food":
+            continue
+        source_key = (life.get("arrive_day"), life.get("leave_day"))
+        nickname = life.get("nickname")
+        life_return_records = {
+            (record.get("day"), record.get("from_leave_day"))
+            for record in (life.get("return_records") or [])
+            if isinstance(record, dict)
+        }
+        if (source_key in returned_sources
+                or (nickname and nickname in present_nicknames)
+                or life_return_records.intersection(present_return_records)):
+            # 兼容异常/旧存档：已回归且仍在塘的个体不能再次成为回归候选。
+            life["return_eligible"] = False
             continue
         leave_day = life.get("leave_day")
         leave_age = life.get("leave_age", life.get("age"))
@@ -3736,8 +3978,14 @@ def _returning_settler(state, name, r):
     for _idx, life, days_away in _eligible_return_lives(state, name):
         if not r.chance(_return_probability(days_away)):
             continue
-        s = _new_settler_dict(name, juvenile=False, state=state, origin="returned")
+        settler_id = _ensure_settler_id(state, life)
+        s = _new_settler_dict(
+            name, juvenile=False, state=state, origin="returned",
+            settler_id=settler_id, parent_ids=life.get("parent_ids", []),
+        )
+        s["legacy_kinship_unknown"] = bool(life.get("legacy_kinship_unknown"))
         s["nickname"] = life.get("nickname")
+        s["descendant_of"] = life.get("descendant_of")
         leave_age = life.get("leave_age", life.get("age", 0)) or 0
         s["age"] = leave_age + days_away
         s["return_from"] = {
@@ -3746,7 +3994,9 @@ def _returning_settler(state, name, r):
             "leave_age": leave_age,
         }
         record = {"day": state["turn"], "after_days": days_away, "from_leave_day": life.get("leave_day")}
-        s.setdefault("return_records", []).append(record)
+        # 把同一个体此前的回归链带回当前住户，后续可据此识别旧档残留候选。
+        s["return_records"] = list(life.get("return_records") or [])
+        s["return_records"].append(record)
         life.setdefault("return_records", []).append(record)
         life["returned_day"] = state["turn"]
         life["return_eligible"] = False
@@ -3775,10 +4025,16 @@ def _descendant_marker(state, name, r):
     if not lives or not r.chance(SETTLER_DESCENDANT_PROB):
         return None, None, None
     life = lives[0][1]
+    ancestor_id = _ensure_settler_id(state, life)
     ancestor = life.get("nickname")
     text = _pick(r, SETTLER_DESCENDANT_TEXT.get(name, []))
     note = _pick(r, SETTLER_DESCENDANT_NOTES).format(ancestor=ancestor)
-    return {"species": name, "ancestor": ancestor, "ancestor_leave_day": life.get("leave_day")}, text, note
+    return {
+        "species": name,
+        "ancestor": ancestor,
+        "ancestor_leave_day": life.get("leave_day"),
+        "ancestor_id": ancestor_id,
+    }, text, note
 
 
 def _record_settler_return_achievements(state, events, name):
@@ -3806,6 +4062,7 @@ def _add_settler(state, name, events=None, r=None):
         descendant, special_text, note = _descendant_marker(state, name, r)
         if descendant:
             settler["descendant_of"] = descendant
+            settler["parent_ids"] = [descendant["ancestor_id"]]
     state["settlers"].append(settler)
     rec = _settler_archive_rec(state, name)
     rec["times"] += 1
@@ -4335,20 +4592,35 @@ def _process_settlers(state, events, r):
     # 空巢：本回合有定居者离开、离开后无任何定居者存活，且万物志曾记录过定居者
     if any_left and len(survivors) == 0 and state["folio"].get("settlers"):
         _unlock(state, events, "空巢")
-    # 繁殖：野生同种 >= 2，春夏季每天 5% 概率，每种每年最多 1 只幼体
+    # 繁殖：同种成体中存在一对非亲子/非同胞配偶，春夏季每天 5% 概率，
+    # 每种每年最多 1 只幼体，且当前同种总数不得超过 max_count。
     if season in ("春", "夏"):
         breed_year = state.setdefault("breed_year", {})
         current_year = state["turn"] // YEAR_LEN
-        wild_counts = {}
+        species_present = set()
         for s in survivors:
-            if s.get("origin") != "born":
-                wild_counts[s["name"]] = wild_counts.get(s["name"], 0) + 1
-        for name, cnt in list(wild_counts.items()):
+            _ensure_settler_id(state, s)
+            s.setdefault("parent_ids", [])
+            s.setdefault(
+                "legacy_kinship_unknown",
+                s.get("origin") == "born" and not s.get("parent_ids"),
+            )
+            species_present.add(s["name"])
+        for name in sorted(species_present):
             if breed_year.get(name) == current_year:
                 continue  # 今年已繁殖过
             cap = SETTLER_TYPES.get(name, {}).get("max_count", 99)
-            if cnt >= 2 and cnt < cap and r.chance(0.05):
-                survivors.append(_new_settler_dict(name, juvenile=True, state=state, origin="born"))
+            total = sum(1 for s in survivors if s.get("name") == name)
+            if total >= cap:
+                continue
+            pairs = _compatible_settler_pairs(survivors, name, mature_only=True)
+            if pairs and r.chance(0.05):
+                first, second = pairs[r.randint(0, len(pairs) - 1)]
+                child = _new_settler_dict(
+                    name, juvenile=True, state=state, origin="born",
+                    parent_ids=[first["settler_id"], second["settler_id"]],
+                )
+                survivors.append(child)
                 breed_year[name] = current_year
                 bred = SETTLER_BREED.get(name)
                 if bred:
@@ -4414,7 +4686,7 @@ def _cn_num(n):
     return s
 
 
-def _trigger_choice(state, events, key, desc_override=None):
+def _trigger_choice(state, events, key, desc_override=None, visit_folio_key=None):
     """触发一个决策事件：设置 pending_choice，本回合不再生成其他随机事件。
 
     desc_override：调用方传入的动态描述（如翠鸟"第N次"按真实来访次数生成）。
@@ -4434,6 +4706,8 @@ def _trigger_choice(state, events, key, desc_override=None):
         "desc": desc,
         "choices": list(spec["choices"]),
     }
+    if visit_folio_key:
+        state["pending_choice"]["visit_folio_key"] = visit_folio_key
     state.setdefault("choice_cooldowns", {})[key] = state["turn"]
     events.append("choice:" + desc)
     return True
@@ -4662,7 +4936,11 @@ def _resolve_choice(state, pc, idx, events):
         if note not in rec.setdefault("notes", []):
             rec["notes"].append(note)
     else:
-        _folio_bump(state, book, folio_key, note="你选择「%s」" % chosen)
+        note = "你选择「%s」" % chosen
+        if pc.get("visit_folio_key") == folio_key:
+            _folio_note(state, book, folio_key, note=note)
+        else:
+            _folio_bump(state, book, folio_key, note=note)
     _chronicle(state, "%s —— 你选择「%s」" % (record_title, chosen))
     # 跨类型全局冷却：任意决策结算后开始计时
     state.setdefault("choice_cooldowns", {})["__any__"] = state["turn"]
@@ -4699,23 +4977,28 @@ def _random_events(state, events, r, season):
     # 连锁：洪水后螃蟹横入 —— 次回合触发螃蟹决策
     if _chain_active(state, "crab_incoming") and _can_invite_settler(state, "螃蟹") \
             and can_choose() and _choice_ready(state, "螃蟹"):
-        _trigger_choice(state, events, "螃蟹", desc_override=_pair_desc(state, "螃蟹", "螃蟹"))
+        _folio_bump(state, "visitors", "螃蟹", "洪水后横入")
+        _trigger_choice(state, events, "螃蟹", desc_override=_pair_desc(state, "螃蟹", "螃蟹"),
+                        visit_folio_key="螃蟹")
         state["chain"].pop("crab_incoming", None)
     # 连锁：暴雨后 15% 概率冲入螃蟹
     if _chain_active(state, "crab_maybe"):
         state["chain"].pop("crab_maybe", None)
         if vis(0.15) and _can_invite_settler(state, "螃蟹") \
                 and can_choose() and _choice_ready(state, "螃蟹"):
-            _trigger_choice(state, events, "螃蟹", desc_override=_pair_desc(state, "螃蟹", "螃蟹"))
+            _folio_bump(state, "visitors", "螃蟹", "暴雨后横入")
+            _trigger_choice(state, events, "螃蟹", desc_override=_pair_desc(state, "螃蟹", "螃蟹"),
+                            visit_folio_key="螃蟹")
 
     # 常见访客 ~8%/天（无需决策）
     # 翠鸟：累计来访 5 次后，下一次变为"定居"决策
     if _can_invite_settler(state, "翠鸟") and vis(0.08):
         loss = r.randint(1, 3)  # 始终消耗，维持随机流对齐
         if vcount("翠鸟") >= 5 and can_choose() and _choice_ready(state, "翠鸟定居"):
+            visit_count = _folio_bump(state, "visitors", "翠鸟", "停在枯枝上打量")
             # 文案动态化：用真实来访次数，而非硬编码"第五次"（item 1）
             desc = ("这是翠鸟第%s次停在那根枯枝上了。今天它没有急着俯冲，"
-                    "而是歪着头，打量着枝杈间的位置。" % _cn_num(vcount("翠鸟")))
+                    "而是歪着头，打量着枝杈间的位置。" % _cn_num(visit_count))
             desc = _pair_desc(state, "翠鸟定居", "翠鸟", fallback=desc)
             _trigger_choice(state, events, "翠鸟定居", desc_override=desc)
         elif pop.get("鳑鲏", 0) >= 1:
@@ -4760,7 +5043,9 @@ def _random_events(state, events, r, season):
         r.randint(1, 2)  # 维持随机流对齐（原立即效果在此消耗一次抽样）
         # 外来水蛇只补到一对；之后扩张交给定居者繁殖。
         if _can_invite_settler(state, "水蛇") and can_choose() and _choice_ready(state, "蛇"):
-            _trigger_choice(state, events, "蛇", desc_override=_pair_desc(state, "蛇", "水蛇"))
+            _folio_bump(state, "visitors", "水蛇来访", "贴水而来")
+            _trigger_choice(state, events, "蛇", desc_override=_pair_desc(state, "蛇", "水蛇"),
+                            visit_folio_key="水蛇来访")
     if vis(0.03):
         # 刺猬：明确捕食水黾 -2~3（item 七）
         if pop.get("水黾", 0) >= 1:
@@ -4783,16 +5068,20 @@ def _random_events(state, events, r, season):
     if _can_invite_settler(state, "苍鹭") and vis(0.005):
         r.randint(3, 5)  # 维持随机流对齐
         if vcount("苍鹭") >= 3 and can_choose() and _choice_ready(state, "苍鹭定居"):
+            visit_count = _folio_bump(state, "visitors", "苍鹭", "衔枝打量高草丛")
             # 文案动态化：用真实来访次数（item 1，与翠鸟同理）
             desc = ("苍鹭第%s次来的时候没有捕鱼。它衔着一根枯枝，放在岸边的高草丛里。"
-                    "然后它又衔来第二根。" % _cn_num(vcount("苍鹭")))
+                    "然后它又衔来第二根。" % _cn_num(visit_count))
             desc = _pair_desc(state, "苍鹭定居", "苍鹭", fallback=desc)
             _trigger_choice(state, events, "苍鹭定居", desc_override=desc)
         elif can_choose() and _choice_ready(state, "苍鹭"):
-            _trigger_choice(state, events, "苍鹭")
+            _folio_bump(state, "visitors", "苍鹭", "浅水伏击")
+            _trigger_choice(state, events, "苍鹭", visit_folio_key="苍鹭")
     if vis(0.005) and _can_invite_settler(state, "流浪乌龟") \
             and can_choose() and _choice_ready(state, "流浪乌龟"):
-        _trigger_choice(state, events, "流浪乌龟", desc_override=_pair_desc(state, "流浪乌龟", "流浪乌龟"))
+        _folio_bump(state, "visitors", "流浪乌龟来访", "池边探头")
+        _trigger_choice(state, events, "流浪乌龟", desc_override=_pair_desc(state, "流浪乌龟", "流浪乌龟"),
+                        visit_folio_key="流浪乌龟来访")
 
     # 传说级访客 ~0.1%/天
     if vis(0.001):
@@ -4807,7 +5096,9 @@ def _random_events(state, events, r, season):
         state["flags"]["duck_visits"] = state["flags"].get("duck_visits", 0) + 1
         if state["flags"]["duck_visits"] >= 3 and _can_invite_settler(state, "野鸭") \
                 and can_choose() and _choice_ready(state, "野鸭"):
-            _trigger_choice(state, events, "野鸭", desc_override=_pair_desc(state, "野鸭", "野鸭"))  # 第 3 次来访 → 定居决策
+            _folio_bump(state, "visitors", "迁徙野鸭群", "落水寻巢")
+            _trigger_choice(state, events, "野鸭", desc_override=_pair_desc(state, "野鸭", "野鸭"),
+                            visit_folio_key="迁徙野鸭群")  # 第 3 次来访 → 定居决策
         else:
             env["detritus"] += 80
             events.append("legend:一群野鸭落在水面，翅膀收起，暗影沉入水里。天亮时它们飞走，留下一池浑浊。")
@@ -7036,6 +7327,8 @@ def _lite_snapshot(state):
         "populations": {k: round(v, 2) for k, v in state["populations"].items() if v > 0},
         "env": {k: round(v, 2) for k, v in state["env"].items()},
         "settlers": state["settlers"],
+        "next_settler_id": state.get("next_settler_id", 1),
+        "breed_year": state.get("breed_year", {}),
         "unlocked_species": state["unlocked_species"],
         "seen": state.get("seen", []),
         "max_seen": {k: round(v, 1) for k, v in state["max_seen"].items()},
@@ -7089,6 +7382,8 @@ def _restore_from_lite(data):
             base["populations"][k] = v
     base["env"].update(data.get("env", {}))
     base["settlers"] = data.get("settlers", [])
+    base["next_settler_id"] = data.get("next_settler_id", 1)
+    base["breed_year"] = data.get("breed_year", {})
     base["unlocked_species"] = data.get("unlocked_species", list(STARTER_SPECIES))
     base["seen"] = data.get("seen", [n for n in RESIDENT_SPECIES
                                       if base["populations"].get(n, 0) >= 1])
@@ -7186,6 +7481,24 @@ def _cmd_import(state, args):
         "（精简存档仅保留关键事件年鉴）" if is_lite else "")
 
 
+def _settler_nickname_conflict(state, settler, nickname):
+    """检查同物种昵称是否已被其他个体占用。
+
+    当前在塘个体和仍有资格回归的离塘个体保留昵称；
+    不同物种可以同名。
+    """
+    species = settler["name"]
+    for other in state.get("settlers", []):
+        if other is settler or other.get("name") != species:
+            continue
+        if other.get("nickname") == nickname:
+            return "current"
+    for _idx, life, _days_away in _eligible_return_lives(state, species):
+        if life.get("nickname") == nickname:
+            return "returning"
+    return None
+
+
 def _cmd_name(state, args):
     """给定居者取名。三种写法：
     name [D-N] 物种 昵称（完整）
@@ -7237,6 +7550,12 @@ def _cmd_name(state, args):
     if not nick:
         return usage
     s = cand[0]
+    if s.get("nickname") != nick:
+        conflict = _settler_nickname_conflict(state, s, nick)
+        if conflict == "current":
+            return "池塘里另一只%s已经叫「%s」，请换一个名字。" % (s["name"], nick)
+        if conflict == "returning":
+            return "「%s」是一位可能回归的%s的名字，请换一个名字。" % (nick, s["name"])
     s["nickname"] = nick
     return "🏷 从此，这只%s有了名字：%s。" % (s["name"], _settler_label(s))
 
