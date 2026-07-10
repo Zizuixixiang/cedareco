@@ -16,6 +16,7 @@ import json
 import re
 import math
 import base64
+import copy
 
 SAVE_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "eco_save.json")
 
@@ -1551,6 +1552,27 @@ ACHIEVEMENTS = {
     "第一次翻塘": "经历过 DO<1.5 的翻塘事件",
     "驱逐者": "成功赶走巴西龟",
     "生态平衡": "通过引入天敌解决了一次生物灾害",
+    # ---- 定居者离别系列 ----
+    "后会有期": "第一次有定居者离开",
+    "留不住的": "累计3位定居者离开",
+    "空巢": "所有定居者同时为0（曾有过定居者）",
+    "蛇去楼空": "水蛇离开累计3次",
+    "不辞而飞": "翠鸟离开累计3次",
+    "鹭过无痕": "苍鹭离开累计3次",
+    "龟去来兮": "流浪乌龟离开累计3次",
+    "嘎然而止": "野鸭离开累计3次",
+    "蟹蟹再见": "螃蟹离开累计3次",
+    "🍊特供 · 蛇我而去": "纪念静静与面条，感谢你发现了水蛇冬眠的Bug。",
+}
+
+# 定居者物种 -> 专属"离开累计3次"成就名
+SETTLER_LEAVE_ACHIEVEMENTS = {
+    "水蛇": "蛇去楼空",
+    "翠鸟": "不辞而飞",
+    "苍鹭": "鹭过无痕",
+    "流浪乌龟": "龟去来兮",
+    "野鸭": "嘎然而止",
+    "螃蟹": "蟹蟹再见",
 }
 
 
@@ -1562,7 +1584,6 @@ def fresh_state(seed):
     # 空池起步：除自带的分解者细菌外，所有物种初始为 0，玩家自行 summon 建设
     pops = {name: 0.0 for name in SPECIES}
     pops["细菌"] = float(SPECIES["细菌"]["init"])
-    # 变态计时器：记录各阶段生物的"队列"（按投放/出生回合分批），简化为平均年龄
     return {
         "version": 2,
         "seed": int(seed),
@@ -3867,21 +3888,26 @@ def _process_settlers(state, events, r):
     env = state["env"]
     season = state["season"]
     survivors = []
+    any_left = False
     for s in state["settlers"]:
         s["age"] += 1
         name = s["name"]
         cfg = SETTLER_TYPES.get(name, {})
-        # 变温动物冬眠：流浪乌龟冬季缩进淤泥，不摄食 / 不掉血 / 不离开，春季苏醒（item 7）
-        if season == "冬" and name == "流浪乌龟":
+        # 变温动物冬眠：流浪乌龟/水蛇冬季缩进淤泥/枯叶，不摄食 / 不掉血 / 不离开，春季苏醒（item 7）
+        if season == "冬" and name in ("流浪乌龟", "水蛇"):
             if not s.get("hibernating"):
                 s["hibernating"] = True
                 hibs = s.setdefault("hibernations", [])
                 hibs.append({"sleep": state["turn"]})
                 if len(hibs) > 2:
                     del hibs[:len(hibs) - 2]
-                events.append("settler:乌龟缩进壳里，慢慢沉到水底的淤泥中。"
-                              "它不吃也不动，把整个冬天睡了过去。")
-                _chronicle(state, "乌龟潜入水底淤泥，开始冬眠。")
+                if name == "水蛇":
+                    events.append("settler:水蛇缓缓盘紧身体，钻进芦苇根部的枯叶堆里，一动不动。")
+                    _chronicle(state, "水蛇钻进芦苇根部，开始冬眠。")
+                else:
+                    events.append("settler:乌龟缩进壳里，慢慢沉到水底的淤泥中。"
+                                  "它不吃也不动，把整个冬天睡了过去。")
+                    _chronicle(state, "乌龟潜入水底淤泥，开始冬眠。")
             rec = state["folio"]["settlers"].setdefault(name, {"times": 0, "max_days": 0})
             if s["age"] > rec.get("max_days", 0):
                 rec["max_days"] = s["age"]
@@ -3893,9 +3919,14 @@ def _process_settlers(state, events, r):
             hibs = s.setdefault("hibernations", [])
             if hibs and "wake" not in hibs[-1]:
                 hibs[-1]["wake"] = state["turn"]
-            events.append("settler:乌龟从淤泥里探出头来，壳上还沾着泥。"
-                          "它慢吞吞爬向有阳光的浅水，冬眠结束了。")
-            _chronicle(state, "乌龟结束冬眠，重新回到池塘。")
+            if name == "水蛇":
+                events.append("settler:芦苇丛深处有什么在动。水蛇从枯叶堆里探出头，"
+                              "吐了吐信子，慢慢滑向水面。")
+                _chronicle(state, "水蛇结束冬眠，重新出没在池塘。")
+            else:
+                events.append("settler:乌龟从淤泥里探出头来，壳上还沾着泥。"
+                              "它慢吞吞爬向有阳光的浅水，冬眠结束了。")
+                _chronicle(state, "乌龟结束冬眠，重新回到池塘。")
         # 幼体成长：到期转为独立定居者
         if s.get("juvenile"):
             s["juvenile_left"] = s.get("juvenile_left", cfg.get("juvenile_days", 0)) - 1
@@ -3913,9 +3944,6 @@ def _process_settlers(state, events, r):
         if s.get("juvenile"):
             # 幼体不自己捕食，靠父母多养一张嘴：额外消耗一份口粮
             _consume_food(state, s, cfg.get("brood_food") or cfg.get("daily_food", {}))
-        elif season == "冬" and name == "水蛇":
-            # 冬季变温动物：水蛇不捕食，寒冷消耗 health 每天 -0.02（item 五）
-            s["health"] = round(s["health"] - 0.02, 3)
         elif cfg.get("hunter"):
             _settler_hunt(state, s, cfg["hunter"], events, r)
         else:
@@ -3969,8 +3997,23 @@ def _process_settlers(state, events, r):
                 notes_joined = " ".join(v.get("notes", []))
                 if "收留" not in notes_joined and "留下" not in notes_joined:
                     v["count"] = 0
+            # 定居者离别成就：累计离开次数（按物种记）
+            leave_count = state.setdefault("settler_leave_count", {})
+            leave_count[name] = leave_count.get(name, 0) + 1
+            total_leaves = sum(leave_count.values())
+            if total_leaves >= 1:
+                _unlock(state, events, "后会有期")
+            if total_leaves >= 3:
+                _unlock(state, events, "留不住的")
+            ach = SETTLER_LEAVE_ACHIEVEMENTS.get(name)
+            if ach and leave_count[name] >= 3:
+                _unlock(state, events, ach)
+            any_left = True
         else:
             survivors.append(s)
+    # 空巢：本回合有定居者离开、离开后无任何定居者存活，且万物志曾记录过定居者
+    if any_left and len(survivors) == 0 and state["folio"].get("settlers"):
+        _unlock(state, events, "空巢")
     # 繁殖：野生同种 >= 2，春夏季每天 5% 概率，每种每年最多 1 只幼体
     if season in ("春", "夏"):
         breed_year = state.setdefault("breed_year", {})
@@ -6165,6 +6208,270 @@ def _cmd_chronicle(state, args):
     entries = ch if show_all else ch[-20:]
     head = "📜 年鉴（共 %d 条%s）" % (len(ch), "" if show_all else "，显示最近 %d 条" % len(entries))
     return head + "\n" + "\n".join("  " + e for e in entries)
+
+
+TROPHIC_LABELS = {
+    "producer": "生产者",
+    "primary": "初级消费者",
+    "secondary": "次级消费者",
+    "apex": "顶级捕食者",
+    "decomposer": "分解者",
+}
+
+
+def _pond_score_comment(state):
+    score, word, dims = _pond_score(state)
+    best = max(dims, key=lambda k: dims[k])
+    worst = min(dims, key=lambda k: dims[k])
+    comment = word
+    if dims[best] - dims[worst] > 20:
+        comment += _pick_t(state, DIMENSION_GOOD[best])
+        comment += "不过" + _pick_t(state, DIMENSION_BAD[worst])
+    return score, comment
+
+
+def _json_pending_choice(state):
+    pc = state.get("pending_choice")
+    if not pc:
+        return None
+    return {
+        "description": pc.get("desc", ""),
+        "options": [
+            {"index": i + 1, "label": label}
+            for i, label in enumerate(pc.get("choices", []))
+        ],
+    }
+
+
+def _json_observe_text(state):
+    snapshot = copy.deepcopy(state)
+    return _observe_text(snapshot, list(snapshot.get("log", [])))
+
+
+def api_state(state):
+    """只读 JSON 状态投影；字段可见性与 status/observe 对齐。"""
+    env = state["env"]
+    pe = state.get("prev_env") or {}
+    score, comment = _pond_score_comment(state)
+    unlocked = _unlocked_set(state)
+    by_troph = {key: [] for key in TROPHIC_LABELS}
+    last_delta = state.get("last_delta", {})
+    for name in RESIDENT_SPECIES:
+        troph = SPECIES[name]["trophic"]
+        if name in unlocked:
+            by_troph.setdefault(troph, []).append({
+                "name": name,
+                "count": _ipop(state, name),
+                "delta": int(last_delta.get(name, 0)),
+            })
+        else:
+            by_troph.setdefault(troph, []).append({
+                "name": "???",
+                "count": None,
+                "delta": None,
+            })
+    settlers = []
+    for s in state.get("settlers", []):
+        if s.get("juvenile"):
+            status = "幼体"
+        elif s.get("hibernating"):
+            status = "冬眠中"
+        else:
+            status = "正常"
+        settlers.append({
+            "species": s.get("name"),
+            "nickname": s.get("nickname"),
+            "label": _settler_label(s),
+            "arrive_day": s.get("arrive_day", max(0, state["turn"] - s.get("age", 0))),
+            "days_alive": s.get("age", 0),
+            "status": status,
+            "health": _health_word(s.get("health", 0)),
+            "health_value": round(s.get("health", 0), 3),
+        })
+    hy = state.get("flags", {}).get("water_hyacinth")
+    water_hyacinth_cover = None
+    if isinstance(hy, dict) and state["turn"] >= hy.get("day", 0) + 3:
+        water_hyacinth_cover = round(hy.get("cover", 0.0), 3)
+    biological = [
+        {"name": name, "elapsed": data.get("elapsed"), "duration": data.get("duration")}
+        for name, data in state.get("diseases", {}).items()
+    ]
+    for name, data in state.get("flags", {}).get("bio_disasters", {}).items():
+        if data:
+            item = {"name": name}
+            if isinstance(data, dict):
+                item.update({k: v for k, v in data.items() if k in ("remaining",)})
+            biological.append(item)
+    return {
+        "day": state["turn"],
+        "season": state["season"],
+        "year": state["turn"] // YEAR_LEN + 1,
+        "weather": state.get("weather", "晴"),
+        "score": score,
+        "comment": comment,
+        "environment": {
+            "water_temp": round(env["water_temp"], 1),
+            "dissolved_oxygen": {
+                "value": round(env["dissolved_oxygen"], 1),
+                "trend": _trend_arrow(env["dissolved_oxygen"], pe.get("dissolved_oxygen")),
+            },
+            "light": round(env["light"], 2),
+            "nutrients": {
+                "value": round(env["nutrients"], 0),
+                "trend": _trend_arrow(env["nutrients"], pe.get("nutrients"), eps=0.5),
+            },
+            "detritus": {
+                "value": round(env["detritus"], 0),
+                "trend": _trend_arrow(env["detritus"], pe.get("detritus"), eps=0.5),
+            },
+            "turbidity": round(env["turbidity"], 2),
+        },
+        "populations": [
+            {"trophic": troph, "label": label, "species": by_troph.get(troph, [])}
+            for troph, label in TROPHIC_LABELS.items()
+        ],
+        "settlers": settlers,
+        "disasters": {
+            "active_weather": state.get("active_weather"),
+            "invasion": _active_invasion(state),
+            "water_hyacinth_cover": water_hyacinth_cover,
+            "biological": biological,
+        },
+        "pending_choice": _json_pending_choice(state),
+        "observe_text": _json_observe_text(state),
+    }
+
+
+def api_codex(state):
+    unlocked = _unlocked_set(state)
+    seen = state.get("seen", [])
+    appeared = [n for n in RESIDENT_SPECIES if n in seen and n in unlocked]
+    species = [
+        {"name": n, "appeared": n in appeared, "unlocked": True}
+        if n in appeared else {"name": "???", "appeared": False, "unlocked": False}
+        for n in RESIDENT_SPECIES
+    ]
+    recorded = [name for name, keys in VISITOR_DEX if _visitor_seen(state, keys)]
+    unseen = [name for name, keys in VISITOR_DEX if not _visitor_seen(state, keys)]
+    hints = []
+    hint_pool = [VISITOR_HINTS[n] for n in unseen if n in VISITOR_HINTS]
+    if hint_pool:
+        r = Mulberry32(state["turn"])
+        hints = _gaze_sample(r, hint_pool, 3)
+    return {
+        "species_count": {"appeared": len(appeared), "total": len(RESIDENT_SPECIES)},
+        "species": species,
+        "visitors": {
+            "recorded_count": len(recorded),
+            "total": len(VISITOR_DEX),
+            "recorded": recorded,
+            "rumors": hints,
+        },
+        "achievements": [
+            {
+                "name": name,
+                "unlocked": name in state.get("achievements", []),
+                "condition": condition,
+            }
+            for name, condition in ACHIEVEMENTS.items()
+        ],
+    }
+
+
+def api_folio(state):
+    cod = state["folio"]
+    ms = state["max_seen"]
+    unlocked = list(state["unlocked_species"])
+    appeared = [n for n in unlocked if n in state["seen"]]
+    species = []
+    for name in appeared:
+        e = cod["species"].get(name, {})
+        species.append({
+            "name": name,
+            "unlock_day": e.get("first_day"),
+            "unlock_text": ("第%d天解锁" % e["first_day"]) if e.get("first_day") is not None else "开局已知",
+            "historical_peak": int(round(ms.get(name, state["populations"].get(name, 0)))),
+            "extinct_count": e.get("extinct_count", 0),
+        })
+    roster = [n for n in unlocked if n not in state["seen"]]
+    undiscovered = [
+        {"name": "???", "clue": FOLIO_CLUES.get(name, "线索隐约，尚不可知")}
+        for name, _c, _t in DISCOVERY_RULES
+        if name not in unlocked
+    ][:2]
+    settlers = []
+    for name, rec in cod["settlers"].items():
+        here = [s for s in state["settlers"] if s["name"] == name]
+        residents = list(rec.get("residents", []))
+        residents.extend({
+            "name": s.get("name"),
+            "nickname": s.get("nickname"),
+            "arrive_day": s.get("arrive_day", max(0, state["turn"] - s.get("age", 0))),
+            "leave_day": None,
+            "hibernations": s.get("hibernations", []),
+        } for s in here)
+        settlers.append({
+            "species": name,
+            "settle_count": rec.get("times", 0),
+            "longest_survival": rec.get("max_days", 0),
+            "current": [
+                {
+                    "label": _settler_label(s),
+                    "age": s.get("age", 0),
+                    "health": _health_word(s.get("health", 0)),
+                }
+                for s in here
+            ],
+            "residents": residents,
+        })
+    return {
+        "species": species,
+        "creation_roster": roster,
+        "undiscovered_clues": undiscovered,
+        "settlers": settlers,
+        "visitors": [
+            {"name": key, "count": rec.get("count", 0), "notes": list(rec.get("notes", [])[:3])}
+            for key, rec in cod["visitors"].items()
+        ],
+        "events": [
+            {"name": key, "count": rec.get("count", 0)}
+            for key, rec in cod["events"].items()
+        ],
+        "disasters": [
+            {
+                "name": key,
+                "count": rec.get("count", 0),
+                "first_day": rec.get("first_day"),
+                "days": list(rec.get("days", [])[-5:]),
+                "notes": list(rec.get("notes", [])[:3]),
+            }
+            for key, rec in cod.get("disasters", {}).items()
+        ],
+    }
+
+
+def api_annals(state):
+    entries = list(state.get("chronicle", []))
+    return {"total": len(entries), "timeline": entries}
+
+
+def api_species(state, name):
+    resolved = _resolve_species(name)
+    if resolved is None or resolved not in _unlocked_set(state):
+        return None
+    sp = SPECIES[resolved]
+    lc = sp.get("lifecycle")
+    return {
+        "name": resolved,
+        "trophic": sp["trophic"],
+        "trophic_label": TROPHIC_LABELS.get(sp["trophic"], ""),
+        "food_sources": list(sp["food_sources"]),
+        "birth_rate": sp["birth_rate"],
+        "death_rate": sp["death_rate"],
+        "max_capacity": sp["max_capacity"],
+        "lifecycle": copy.deepcopy(lc) if lc else None,
+        "current_count": _ipop(state, resolved),
+    }
 
 
 def _gaze_pick(r, options):
