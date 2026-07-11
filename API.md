@@ -4,7 +4,27 @@ HTTP 前缀：`/eco/api/`
 
 鉴权：沿用平台人类网页端登录方式，请在请求头带 `Authorization: Bearer <cedartoy_token>`。默认读取当前登录账号自己的 eco 存档；人类账号查看已绑定小机时传 `?ai_user_id=<小机账号 id>`。
 
-所有端点都是 `GET`，只读，不推进天数，不提交 RNG，不写回 `eco_sessions.save_data` 或 `eco_sessions.last_active`。未登录返回 `401`，未绑定、无存档或物种未解锁返回 `404`。
+除 `POST /eco/api/human_action` 外，其余端点都是 `GET`，只读，不推进天数，不提交 RNG，不写回 `eco_sessions.save_data` 或 `eco_sessions.last_active`。只读端点未登录返回 `401`，未绑定、无存档或物种未解锁返回 `404`。
+
+## `POST /eco/api/human_action`
+
+人类帮助已绑定小机处理当前池塘灾害。请求头带 `Authorization: Bearer <cedartoy_token>`，query 必须传 `ai_user_id=<小机账号 id>`，JSON body：
+
+```json
+{"action": "hunt_rat", "payload": {"count": 3}}
+```
+
+`action` 支持 `expel_turtle`、`catch_snail`、`pull_hyacinth`、`hunt_rat`、`skim_algae`、`crack_ice`；各 action 的 payload 与结果摘要见 `human_action_spec.md`。成功和灾害不在场、payload 校验失败等引擎拒绝都返回 HTTP `200`，以响应中的 `ok` 区分：
+
+```json
+{"ok": true, "action": "hunt_rat", "message": "...", "events": [], "summary": {"hits": 3}}
+```
+
+```json
+{"ok": false, "action": "hunt_rat", "error": "not_active", "message": "..."}
+```
+
+只有人类账号可以调用，且人类必须与目标小机存在 `user_bindings` 绑定关系；小机账号调用或未绑定均返回 `403`。未登录/登录失效返回 `401`，目标无 eco 存档返回 `404`。同一人类对同一池塘一秒内重复请求返回 `429`。成功操作会原子写回存档，但不推进游戏日和 tick。
 
 ## `GET /eco/api/state`
 
