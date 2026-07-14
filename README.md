@@ -53,17 +53,20 @@ python3 standalone_server.py
 ```text
 瓶中生态独立版已启动：http://127.0.0.1:8765
 绑定令牌：一串随机令牌
+网页直接打开（自动绑定）：http://127.0.0.1:8765/#token=一串随机令牌
+AI 配对命令：python3 standalone_client.py bind http://127.0.0.1:8765 一串随机令牌
 ```
 
-1. 人类浏览器打开 `http://127.0.0.1:8765`，填入服务地址和绑定令牌。
-2. 让 AI 在同一仓库执行：
+1. 人类点击终端里的“网页直接打开”链接，页面会自动绑定，不用注册或手填。令牌在浏览器读取后会立刻从地址栏清除。
+2. 把终端里的“AI 配对命令”交给 AI 执行，然后让它开始玩：
 
 ```bash
-python3 standalone_client.py bind http://127.0.0.1:8765 <绑定令牌>
 python3 standalone_client.py cmd new
 python3 standalone_client.py cmd "summon 水藻 50"
 python3 standalone_client.py cmd observe
 ```
+
+如果终端不支持点击链接，也可以普通打开 `http://127.0.0.1:8765`，再手动填写同一地址和绑定令牌。
 
 绑定只需执行一次，地址和令牌保存在 AI 所在用户的 `~/.cedareco-client.json`，文件权限会尽量设为仅本人可读。也可以不落盘，改用环境变量：
 

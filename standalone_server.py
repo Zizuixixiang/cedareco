@@ -172,6 +172,15 @@ def load_or_create_token(data_dir, explicit=None):
     return token
 
 
+def local_urls(host, port, token):
+    """返回适合终端点击的本机地址和一次性网页配对地址。"""
+    shown_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
+    url_host = "[%s]" % shown_host if ":" in shown_host else shown_host
+    base_url = "http://%s:%d" % (url_host, port)
+    fragment = urllib.parse.urlencode({"token": token})
+    return base_url, "%s/#%s" % (base_url, fragment)
+
+
 def make_handler(store, token, allowed_origin="*"):
     class StandaloneHandler(BaseHTTPRequestHandler):
         server_version = "CedarEcoStandalone/1.0"
@@ -331,10 +340,13 @@ def main(argv=None):
     token = load_or_create_token(data_dir, args.token)
     store = PondStore(data_dir / "eco_save.json", args.seed)
     server = ThreadingHTTPServer((args.host, args.port), make_handler(store, token, args.allowed_origin))
-    shown_host = "127.0.0.1" if args.host in ("0.0.0.0", "::") else args.host
-    print("瓶中生态独立版已启动：http://%s:%d" % (shown_host, args.port))
+    actual_port = server.server_address[1]
+    base_url, paired_url = local_urls(args.host, actual_port, token)
+    print("瓶中生态独立版已启动：%s" % base_url)
     print("绑定令牌：%s" % token)
-    print("把地址和令牌填进网页，也把它们交给你的 AI。按 Ctrl+C 停止。")
+    print("网页直接打开（自动绑定）：%s" % paired_url)
+    print("AI 配对命令：python3 standalone_client.py bind %s %s" % (base_url, token))
+    print("按 Ctrl+C 停止。")
     try:
         server.serve_forever()
     except KeyboardInterrupt:

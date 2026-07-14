@@ -3,6 +3,7 @@
 
 import json
 import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -16,7 +17,7 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 import engine  # noqa: E402
-from standalone_server import PondStore, load_or_create_token, make_handler  # noqa: E402
+from standalone_server import PondStore, load_or_create_token, local_urls, make_handler  # noqa: E402
 
 
 def check(label, condition):
@@ -80,6 +81,8 @@ def main():
         token = load_or_create_token(data_dir)
         check("自动生成绑定令牌", len(token) >= 24)
         check("绑定令牌可稳定复用", load_or_create_token(data_dir) == token)
+        base_url, paired_url = local_urls("0.0.0.0", 8765, token)
+        check("本机网页链接可一键绑定", base_url == "http://127.0.0.1:8765" and paired_url.endswith("#token=" + token))
 
         store = PondStore(data_dir / "eco_save.json", seed=77)
         state = store.project("state")
@@ -117,6 +120,26 @@ def main():
                 check("错误绑定令牌返回 401", exc.code == 401)
             status, _, payload = http_json(base + "/api/state", token)
             check("绑定后可读取正式状态 API", status == 200 and "hunt_rat" in payload["data"]["available_human_actions"])
+            with urllib.request.urlopen(base + "/", timeout=5) as response:
+                html = response.read().decode("utf-8")
+                check("服务端直接提供独立网页", response.status == 200 and 'id="bind-form"' in html)
+            with urllib.request.urlopen(base + "/app.js", timeout=5) as response:
+                javascript = response.read().decode("utf-8")
+                check("网页支持终端链接自动配对", response.status == 200 and "readFragmentBinding" in javascript)
+
+            client_config = data_dir / "client.json"
+            environment = os.environ.copy()
+            environment["CEDARECO_CLIENT_CONFIG"] = str(client_config)
+            bound = subprocess.run(
+                [sys.executable, str(ROOT / "standalone_client.py"), "bind", base, token],
+                cwd=str(data_dir), env=environment, capture_output=True, text=True, timeout=10,
+            )
+            check("AI 客户端可一次配对", bound.returncode == 0 and client_config.is_file())
+            client_status = subprocess.run(
+                [sys.executable, str(ROOT / "standalone_client.py"), "cmd", "status"],
+                cwd=str(data_dir), env=environment, capture_output=True, text=True, timeout=10,
+            )
+            check("AI 客户端配对后可直接玩", client_status.returncode == 0 and "池塘" in client_status.stdout)
             status, _, payload = http_json(base + "/api/command", token, {"command": "status"})
             check("AI HTTP 指令接口可用", status == 200 and payload["ok"] and "池塘" in payload["text"])
             status, _, payload = http_json(base + "/api/human_action", token, {"action": "hunt_rat", "payload": {"count": 3}})

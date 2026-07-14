@@ -12,7 +12,7 @@ const GAME_INFO = {
 };
 const ACTION_TO_GAME = Object.fromEntries(Object.entries(GAME_INFO).map(([game, info]) => [info.action, game]));
 
-let binding = readBinding();
+let binding = readFragmentBinding() || readBinding();
 let latestState = null;
 let currentView = "state";
 let pollTimer = null;
@@ -54,6 +54,18 @@ function readBinding() {
     if (value && typeof value.url === "string" && typeof value.token === "string") return value;
   } catch (_error) { /* 重新绑定即可。 */ }
   return null;
+}
+
+function readFragmentBinding() {
+  const fragment = location.hash.replace(/^#/u, "");
+  if (!fragment) return null;
+  const params = new URLSearchParams(fragment);
+  const token = String(params.get("token") || "").trim();
+  if (!token) return null;
+  const url = normalizeUrl(params.get("url") || defaultServerUrl());
+  // 令牌放在 URL fragment 中不会发送给服务器；读取后也立即从地址栏和历史中清掉。
+  try { history.replaceState(null, "", `${location.pathname}${location.search}`); } catch (_error) { /* 不影响配对。 */ }
+  return url ? { url, token } : null;
 }
 
 function defaultServerUrl() {

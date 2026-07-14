@@ -11,8 +11,10 @@ build_blind.py —— 盲玩版打包器
     ecosystem.py（与 engine.py 行为一致，但源码经过编码隐藏）
 """
 
-import os
+import argparse
 import base64
+import os
+import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 SRC_PATH = os.path.join(HERE, "engine.py")
@@ -77,7 +79,7 @@ if __name__ == "__main__":
 '''
 
 
-def build():
+def render():
     with open(SRC_PATH, "r", encoding="utf-8") as f:
         src = f.read()
     b64 = base64.b64encode(src.encode("utf-8")).decode("ascii")
@@ -86,11 +88,35 @@ def build():
     rows = [b64[i:i + width] for i in range(0, len(b64), width)]
     chunks = "\n".join('    "%s"' % row for row in rows)
     out = WRAPPER.replace("{chunks}", chunks)
+    return src, b64, rows, out
+
+
+def build():
+    src, b64, rows, out = render()
     with open(OUT_PATH, "w", encoding="utf-8") as f:
         f.write(out)
     print("已生成 %s（源码 %d 字节 → base64 %d 字符，%d 行）" %
           (os.path.basename(OUT_PATH), len(src), len(b64), len(rows)))
 
 
+def check():
+    _src, _b64, _rows, expected = render()
+    try:
+        with open(OUT_PATH, "r", encoding="utf-8") as f:
+            actual = f.read()
+    except OSError:
+        actual = None
+    if actual != expected:
+        print("ecosystem.py 已落后于 engine.py；请运行 python3 build_blind.py", file=sys.stderr)
+        return 1
+    print("ecosystem.py 已包含当前 engine.py ✅")
+    return 0
+
+
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="生成或检查瓶中生态盲玩版")
+    parser.add_argument("--check", action="store_true", help="只检查 ecosystem.py 是否为最新生成结果")
+    args = parser.parse_args()
+    if args.check:
+        sys.exit(check())
     build()
