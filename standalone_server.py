@@ -2,14 +2,13 @@
 """瓶中生态独立网页服务。
 
 零第三方依赖，同时提供静态前端、AI 指令 API 和人类灾害协作 API。
-一个服务实例对应一座池塘；网页与 AI 通过同一访问令牌共享同一份存档。
+一个服务实例对应一座池塘；网页与 AI 直接共享同一份本地存档。
 """
 
 import argparse
 import json
 import mimetypes
 import os
-import secrets
 import tempfile
 import threading
 import urllib.parse
@@ -154,34 +153,14 @@ class PondStore:
             return engine.api_state(state)
 
 
-def load_or_create_token(data_dir, explicit=None):
-    if explicit:
-        return explicit.strip()
-    token_path = Path(data_dir) / "access_token"
-    if token_path.exists():
-        token = token_path.read_text(encoding="utf-8").strip()
-        if token:
-            return token
-    token = secrets.token_urlsafe(24)
-    token_path.parent.mkdir(parents=True, exist_ok=True)
-    token_path.write_text(token + "\n", encoding="utf-8")
-    try:
-        token_path.chmod(0o600)
-    except OSError:
-        pass
-    return token
-
-
-def local_urls(host, port, token):
-    """返回适合终端点击的本机地址和一次性网页配对地址。"""
+def local_url(host, port):
+    """返回适合终端点击的本机地址。"""
     shown_host = "127.0.0.1" if host in ("0.0.0.0", "::") else host
     url_host = "[%s]" % shown_host if ":" in shown_host else shown_host
-    base_url = "http://%s:%d" % (url_host, port)
-    fragment = urllib.parse.urlencode({"token": token})
-    return base_url, "%s/#%s" % (base_url, fragment)
+    return "http://%s:%d" % (url_host, port)
 
 
-def make_handler(store, token, allowed_origin="*"):
+def make_handler(store, allowed_origin="*"):
     class StandaloneHandler(BaseHTTPRequestHandler):
         server_version = "CedarEcoStandalone/1.0"
 
@@ -190,7 +169,7 @@ def make_handler(store, token, allowed_origin="*"):
 
         def _cors_headers(self):
             self.send_header("Access-Control-Allow-Origin", allowed_origin)
-            self.send_header("Access-Control-Allow-Headers", "Authorization, Content-Type")
+            self.send_header("Access-Control-Allow-Headers", "Content-Type")
             self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
             self.send_header("Vary", "Origin")
 
@@ -209,18 +188,6 @@ def make_handler(store, token, allowed_origin="*"):
             self._security_headers()
             self.end_headers()
             self.wfile.write(body)
-
-        def _authorized(self):
-            supplied = self.headers.get("Authorization", "")
-            if supplied.lower().startswith("bearer "):
-                supplied = supplied[7:].strip()
-            else:
-                supplied = ""
-            return bool(supplied) and secrets.compare_digest(supplied, token)
-
-        def _require_auth(self):
-            if not self._authorized():
-                raise ApiError(401, "访问令牌不正确，请重新绑定")
 
         def _read_json(self):
             raw_length = self.headers.get("Content-Length", "0")
@@ -277,7 +244,6 @@ def make_handler(store, token, allowed_origin="*"):
                     self._json(200, {"ok": True, "service": "cedareco-standalone"})
                     return
                 if parsed.path.startswith("/api/"):
-                    self._require_auth()
                     route = parsed.path[len("/api/"):]
                     if route in ("state", "codex", "folio", "annals"):
                         self._json(200, {"ok": True, "data": store.project(route)})
@@ -296,7 +262,6 @@ def make_handler(store, token, allowed_origin="*"):
         def do_POST(self):
             try:
                 parsed = urllib.parse.urlsplit(self.path)
-                self._require_auth()
                 body = self._read_json()
                 if parsed.path == "/api/command":
                     text = store.command(body.get("command"))
@@ -327,8 +292,7 @@ def parse_args(argv=None):
     parser = argparse.ArgumentParser(description="启动瓶中生态独立前端与 API")
     parser.add_argument("--host", default=os.getenv("CEDARECO_HOST", "127.0.0.1"))
     parser.add_argument("--port", type=int, default=int(os.getenv("CEDARECO_PORT", "8765")))
-    parser.add_argument("--data-dir", default=os.getenv("CEDARECO_DATA_DIR", str(ROOT / ".cedareco")))
-    parser.add_argument("--token", default=os.getenv("CEDARECO_TOKEN"))
+    parser.add_argument("--save", default=os.getenv("CEDARECO_SAVE_FILE", str(ROOT / "eco_save.json")))
     parser.add_argument("--seed", type=int, default=int(os.getenv("CEDARECO_SEED", "12345")))
     parser.add_argument("--allowed-origin", default=os.getenv("CEDARECO_ALLOWED_ORIGIN", "*"))
     return parser.parse_args(argv)
@@ -336,16 +300,13 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
-    data_dir = Path(args.data_dir).expanduser().resolve()
-    token = load_or_create_token(data_dir, args.token)
-    store = PondStore(data_dir / "eco_save.json", args.seed)
-    server = ThreadingHTTPServer((args.host, args.port), make_handler(store, token, args.allowed_origin))
+    save_path = Path(args.save).expanduser().resolve()
+    store = PondStore(save_path, args.seed)
+    server = ThreadingHTTPServer((args.host, args.port), make_handler(store, args.allowed_origin))
     actual_port = server.server_address[1]
-    base_url, paired_url = local_urls(args.host, actual_port, token)
+    base_url = local_url(args.host, actual_port)
     print("瓶中生态独立版已启动：%s" % base_url)
-    print("绑定令牌：%s" % token)
-    print("网页直接打开（自动绑定）：%s" % paired_url)
-    print("AI 配对命令：python3 standalone_client.py bind %s %s" % (base_url, token))
+    print("浏览器直接打开上面的地址；本机 AI 可直接使用 standalone_client.py。")
     print("按 Ctrl+C 停止。")
     try:
         server.serve_forever()

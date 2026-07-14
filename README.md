@@ -34,11 +34,11 @@
 
 ### 独立人类前端（不需要 CedarToy 账号）
 
-仓库自带一个可独立部署的人类观察/协作前端。它不依赖 CedarToy 登录、账号表、`ai_user_id` 或小机绑定关系；一个服务实例就是一座池塘，网页和你的 AI 用同一个令牌配对，并共享同一份存档。
+仓库自带一个独立的人类观察/协作前端。它没有用户、登录、令牌、`ai_user_id` 或小机绑定关系：一个服务进程就是一座池塘，网页和 AI 直接读写仓库根目录的 `eco_save.json`。已有盲玩存档会直接沿用，不会新建第二份池塘。
 
 前端包含池塘状态、种群、图鉴、年鉴，以及只在对应灾害发生时出现的六个协作小游戏。没有灾害时，正式界面不会常驻显示小游戏入口。
 
-#### 最快启动：人类和 AI 在同一台电脑
+#### 直接启动
 
 需要 Python 3.7+，不需要安装第三方包。
 
@@ -52,13 +52,9 @@ python3 standalone_server.py
 
 ```text
 瓶中生态独立版已启动：http://127.0.0.1:8765
-绑定令牌：一串随机令牌
-网页直接打开（自动绑定）：http://127.0.0.1:8765/#token=一串随机令牌
-AI 配对命令：python3 standalone_client.py bind http://127.0.0.1:8765 一串随机令牌
 ```
 
-1. 人类点击终端里的“网页直接打开”链接，页面会自动绑定，不用注册或手填。令牌在浏览器读取后会立刻从地址栏清除。
-2. 把终端里的“AI 配对命令”交给 AI 执行，然后让它开始玩：
+人类浏览器直接打开 `http://127.0.0.1:8765`。AI 在同一仓库直接执行：
 
 ```bash
 python3 standalone_client.py cmd new
@@ -66,21 +62,11 @@ python3 standalone_client.py cmd "summon 水藻 50"
 python3 standalone_client.py cmd observe
 ```
 
-如果终端不支持点击链接，也可以普通打开 `http://127.0.0.1:8765`，再手动填写同一地址和绑定令牌。
-
-绑定只需执行一次，地址和令牌保存在 AI 所在用户的 `~/.cedareco-client.json`，文件权限会尽量设为仅本人可读。也可以不落盘，改用环境变量：
-
-```bash
-export CEDARECO_URL=http://127.0.0.1:8765
-export CEDARECO_TOKEN=<绑定令牌>
-python3 standalone_client.py cmd status
-```
-
 可以把下面这段直接发给 AI：
 
-> 这是我的瓶中生态池塘。请在 cedareco 仓库里运行 `python3 standalone_client.py bind <服务地址> <绑定令牌>` 完成绑定，以后只通过 `python3 standalone_client.py cmd "指令"` 玩。先执行 `cmd new`，再执行 `cmd help`，不要直接 import ecosystem，否则不会和人类网页共享同一份存档。
+> 这是我的瓶中生态池塘。请在 cedareco 仓库里通过 `python3 standalone_client.py cmd "指令"` 玩。先执行 `cmd new`，再执行 `cmd help`。不要直接 import ecosystem，否则不会和人类网页共享同一份存档。
 
-#### 局域网或远程绑定
+#### 在局域网另一台设备上打开
 
 让服务监听所有网卡：
 
@@ -88,38 +74,23 @@ python3 standalone_client.py cmd status
 python3 standalone_server.py --host 0.0.0.0 --port 8765
 ```
 
-然后把 `127.0.0.1` 换成运行服务那台机器的局域网地址。AI 如果运行在 Docker、云主机或另一台电脑中，`127.0.0.1` 指向的是 AI 自己，必须填写它实际能够访问到的服务地址。
-
-如果经公网使用，务必在 Caddy/Nginx/Cloudflare 等反向代理后启用 HTTPS；不要通过明文 HTTP 在公网传输绑定令牌。可以固定令牌并限制跨域来源：
+然后在手机或另一台电脑打开服务端的局域网地址，例如 `http://192.168.1.20:8765`。AI 不在服务端电脑时，使用 `--url` 指定同一个地址：
 
 ```bash
-CEDARECO_TOKEN='换成你自己的长随机串' \
-python3 standalone_server.py \
-  --host 0.0.0.0 \
-  --allowed-origin https://你的用户名.github.io
+python3 standalone_client.py --url http://192.168.1.20:8765 cmd observe
 ```
 
-常用配置也可以用环境变量设置：`CEDARECO_HOST`、`CEDARECO_PORT`、`CEDARECO_DATA_DIR`、`CEDARECO_TOKEN`、`CEDARECO_SEED`、`CEDARECO_ALLOWED_ORIGIN`。
+也可以设置 `CEDARECO_URL`，之后省略 `--url`。服务端常用配置包括 `CEDARECO_HOST`、`CEDARECO_PORT`、`CEDARECO_SAVE_FILE`、`CEDARECO_SEED`、`CEDARECO_ALLOWED_ORIGIN`。
 
-#### 单独发布静态前端 / GitHub Pages
+> 独立版没有账号鉴权，适合本机或可信局域网。不要把端口直接暴露到公网；确需公网使用时，请在 VPN 或带身份认证的反向代理后部署。
 
-静态文件在 `web/`，图片在 `assets/`。GitHub 仓库设置 Pages 为 `main / root` 后，可直接访问：
+#### 存档
 
-```text
-https://<你的用户名>.github.io/<仓库名>/web/
-```
-
-网页首次打开会要求填写你自己的 API 地址和令牌。静态页面可以放在 GitHub Pages，Python 服务则部署在另一台机器；此时 API 必须使用公网可访问的 HTTPS 地址，并把 `--allowed-origin` 设为你的 Pages 来源。
-
-#### 存档、令牌与解绑
-
-- 独立版存档：`.cedareco/eco_save.json`
-- 自动生成的服务令牌：`.cedareco/access_token`
-- AI 客户端绑定：`~/.cedareco-client.json`
-- 网页绑定：只存在浏览器 `localStorage`，点“解绑”即可删除
-- 备份池塘时复制 `.cedareco/eco_save.json`
+- 独立版唯一的运行数据是仓库根目录的 `eco_save.json`
+- 已经用 `ecosystem.py` 玩过时，启动前端会直接读取原来的 `eco_save.json`
+- 备份池塘时复制 `eco_save.json`
 - 重开：`python3 standalone_client.py new [seed]`
-- 一台服务默认对应一座池塘；需要多座池塘时，用不同 `--data-dir` 和端口分别启动
+- 一台服务默认对应一座池塘；需要指定另一份存档时使用 `--save /path/to/eco_save.json`
 
 独立版验证命令：
 
@@ -127,7 +98,7 @@ https://<你的用户名>.github.io/<仓库名>/web/
 python3 scripts/verify_standalone.py
 ```
 
-> 注意：独立前端模式下，AI 应使用 `standalone_client.py`。直接运行 `ecosystem.py` 会读写仓库根目录的 `eco_save.json`，那是另一份存档，不会同步到网页。
+> 前端运行期间，AI 最好使用 `standalone_client.py`，这样网页小游戏和 AI 指令会串行写入同一份存档。`ecosystem.py` 与前端现在也是同一个 `eco_save.json`，但不要让两个常驻进程同时改它，以免旧内存覆盖新结果。
 
 ### 各平台说明
 
@@ -237,7 +208,7 @@ print(ecosystem.cmd("observe"))   # 看看池塘
 ecosystem.py    — 盲玩版（AI 用这个玩，看不到参数）
 engine.py       — 完整引擎（含所有公式和数据，可能会剧透，不建议先看）
 standalone_server.py — 独立前端与共享存档 API（零依赖）
-standalone_client.py — 给自己的 AI 使用的配对/指令客户端
+standalone_client.py — 给自己的 AI 使用的共享存档指令客户端
 web/            — 可直接部署的静态人类前端
 assets/         — 前端场景、物种与小游戏素材
 ```

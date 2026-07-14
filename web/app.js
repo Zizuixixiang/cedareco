@@ -12,7 +12,7 @@ const GAME_INFO = {
 };
 const ACTION_TO_GAME = Object.fromEntries(Object.entries(GAME_INFO).map(([game, info]) => [info.action, game]));
 
-let binding = readFragmentBinding() || readBinding();
+let binding = readBinding() || { url: defaultServerUrl() };
 let latestState = null;
 let currentView = "state";
 let pollTimer = null;
@@ -22,7 +22,6 @@ const bindingNode = document.getElementById("binding");
 const appNode = document.getElementById("pond-app");
 const bindForm = document.getElementById("bind-form");
 const serverUrlInput = document.getElementById("server-url");
-const accessTokenInput = document.getElementById("access-token");
 const bindError = document.getElementById("bind-error");
 const connectionNode = document.getElementById("connection");
 const modal = document.getElementById("modal");
@@ -51,21 +50,9 @@ function clear(node) {
 function readBinding() {
   try {
     const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
-    if (value && typeof value.url === "string" && typeof value.token === "string") return value;
-  } catch (_error) { /* 重新绑定即可。 */ }
+    if (value && typeof value.url === "string") return { url: normalizeUrl(value.url) };
+  } catch (_error) { /* 重新连接即可。 */ }
   return null;
-}
-
-function readFragmentBinding() {
-  const fragment = location.hash.replace(/^#/u, "");
-  if (!fragment) return null;
-  const params = new URLSearchParams(fragment);
-  const token = String(params.get("token") || "").trim();
-  if (!token) return null;
-  const url = normalizeUrl(params.get("url") || defaultServerUrl());
-  // 令牌放在 URL fragment 中不会发送给服务器；读取后也立即从地址栏和历史中清掉。
-  try { history.replaceState(null, "", `${location.pathname}${location.search}`); } catch (_error) { /* 不影响配对。 */ }
-  return url ? { url, token } : null;
 }
 
 function defaultServerUrl() {
@@ -81,15 +68,12 @@ function assetUrl(path) {
 }
 
 async function api(path, options = {}) {
-  if (!binding) throw new Error("尚未绑定池塘");
+  if (!binding) throw new Error("尚未连接池塘服务");
   let response;
   try {
     response = await fetch(binding.url + path, {
       method: options.method || "GET",
-      headers: {
-        Authorization: `Bearer ${binding.token}`,
-        ...(options.body === undefined ? {} : { "Content-Type": "application/json" })
-      },
+      headers: options.body === undefined ? {} : { "Content-Type": "application/json" },
       body: options.body === undefined ? undefined : JSON.stringify(options.body)
     });
   } catch (_error) {
@@ -612,10 +596,9 @@ async function connect(candidate) {
 bindForm.addEventListener("submit", async event => {
   event.preventDefault();
   bindError.hidden = true;
-  const candidate = { url: normalizeUrl(serverUrlInput.value), token: accessTokenInput.value.trim() };
+  const candidate = { url: normalizeUrl(serverUrlInput.value) };
   try {
     await connect(candidate);
-    accessTokenInput.value = "";
   } catch (error) {
     binding = null;
     bindError.textContent = error.message;
@@ -624,14 +607,13 @@ bindForm.addEventListener("submit", async event => {
 });
 
 document.getElementById("refresh").addEventListener("click", () => selectView(currentView));
-document.getElementById("unbind").addEventListener("click", () => {
+document.getElementById("change-server").addEventListener("click", () => {
   localStorage.removeItem(STORAGE_KEY);
   binding = null;
   latestState = null;
   if (pollTimer) clearInterval(pollTimer);
   appNode.hidden = true;
   bindingNode.hidden = false;
-  accessTokenInput.value = "";
 });
 document.getElementById("modal-close").addEventListener("click", closeModal);
 modal.addEventListener("click", event => { if (event.target === modal) closeModal(); });

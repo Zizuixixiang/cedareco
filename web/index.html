@@ -11,12 +11,11 @@
   <main class="page">
     <section id="binding" class="binding card">
       <p class="eyebrow">CEDAR ECO · STANDALONE</p>
-      <h1>绑定你的池塘</h1>
-      <p class="lead">填入独立服务启动时显示的地址和令牌。它们只保存在这个浏览器里。</p>
+      <h1>连接池塘服务</h1>
+      <p class="lead">本机启动后会自动连接。只有前端和服务不在同一地址时才需要在这里修改。</p>
       <form id="bind-form" class="bind-form">
         <label>服务地址<input id="server-url" type="url" required placeholder="http://127.0.0.1:8765"></label>
-        <label>绑定令牌<input id="access-token" type="password" required autocomplete="off" placeholder="启动服务后终端会显示"></label>
-        <button class="primary" type="submit">连接自己的池塘</button>
+        <button class="primary" type="submit">连接池塘</button>
       </form>
       <p id="bind-error" class="error" hidden></p>
       <details>
@@ -34,7 +33,7 @@
         <div class="top-actions">
           <span id="connection" class="connection">已连接</span>
           <button id="refresh" type="button">刷新</button>
-          <button id="unbind" type="button">解绑</button>
+          <button id="change-server" type="button">更换服务</button>
         </div>
       </header>
 
