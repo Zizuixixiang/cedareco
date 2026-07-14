@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>瓶中生态 · 独立前端</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="page">
+    <section id="binding" class="binding card">
+      <p class="eyebrow">CEDAR ECO · STANDALONE</p>
+      <h1>绑定你的池塘</h1>
+      <p class="lead">填入独立服务启动时显示的地址和令牌。它们只保存在这个浏览器里。</p>
+      <form id="bind-form" class="bind-form">
+        <label>服务地址<input id="server-url" type="url" required placeholder="http://127.0.0.1:8765"></label>
+        <label>绑定令牌<input id="access-token" type="password" required autocomplete="off" placeholder="启动服务后终端会显示"></label>
+        <button class="primary" type="submit">连接自己的池塘</button>
+      </form>
+      <p id="bind-error" class="error" hidden></p>
+      <details>
+        <summary>还没有服务？</summary>
+        <pre>python standalone_server.py</pre>
+      </details>
+    </section>
+
+    <section id="pond-app" hidden>
+      <header class="topbar card">
+        <div>
+          <p class="eyebrow">瓶中生态 · 人类观察窗</p>
+          <h1>我的池塘</h1>
+        </div>
+        <div class="top-actions">
+          <span id="connection" class="connection">已连接</span>
+          <button id="refresh" type="button">刷新</button>
+          <button id="unbind" type="button">解绑</button>
+        </div>
+      </header>
+
+      <nav class="tabs" aria-label="池塘页面">
+        <button class="tab active" data-view="state" type="button">池塘</button>
+        <button class="tab" data-view="codex" type="button">图鉴</button>
+        <button class="tab" data-view="annals" type="button">年鉴</button>
+      </nav>
+
+      <section id="view-state" class="view"></section>
+      <section id="view-codex" class="view" hidden></section>
+      <section id="view-annals" class="view" hidden></section>
+    </section>
+  </main>
+
+  <div id="modal" class="modal" hidden>
+    <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <header><h2 id="modal-title"></h2><button id="modal-close" type="button" aria-label="关闭">×</button></header>
+      <div id="modal-body" class="modal-body"></div>
+    </section>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>

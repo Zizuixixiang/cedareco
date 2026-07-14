@@ -1,5 +1,7 @@
 # 瓶中生态只读 JSON API
 
+> 本文描述 CedarToy 平台适配接口（依赖平台账号和人机绑定）。开源仓库自带的无账号独立版使用 `/api/*` 和访问令牌，启动、绑定与部署方式见 [README 的“独立人类前端”](README.md#独立人类前端不需要-cedartoy-账号)。
+
 HTTP 前缀：`/eco/api/`
 
 鉴权：沿用平台人类网页端登录方式，请在请求头带 `Authorization: Bearer <cedartoy_token>`。默认读取当前登录账号自己的 eco 存档；人类账号查看已绑定小机时传 `?ai_user_id=<小机账号 id>`。
