@@ -2275,6 +2275,7 @@ def fresh_state(seed):
         "key_chronicle": [],         # 关键事件年鉴（解锁/归零/定居者来去/灾害/成就/季节）—— export lite 保留
         "pending_choice": None,      # 待决策事件 dict，或 None
         "pending_wait_days": 0,      # 决策中断的 wait 剩余天数
+        "pending_human_notices": [], # 人类前端协作结果，小机下次指令弹出后消费
         "choice_cooldowns": {},      # 决策事件 -> 上次触发的回合（冷却用）
         "extinct_alerted": [],       # 已就归零提醒过的物种（去重，恢复后清除）
         "extinct_turn": {},          # 物种 -> 归零回合（summon 15 天冷却用）
@@ -2380,6 +2381,8 @@ def _migrate(state):
     state.setdefault("key_chronicle", [])
     state.setdefault("pending_choice", None)
     state.setdefault("pending_wait_days", 0)
+    if not isinstance(state.get("pending_human_notices"), list):
+        state["pending_human_notices"] = []
     state.setdefault("choice_cooldowns", {})
     state.setdefault("extinct_alerted", [])
     state.setdefault("extinct_turn", {})
@@ -7176,7 +7179,7 @@ def cmd(command):
     parts = [p.strip() for p in re.split(r"[;；]", command) if p.strip()]
     if not parts:
         return _help_text()
-    outputs = []
+    outputs = _take_human_notices(state)
     skipped = []
     for part in parts:
         # 决策待定时，明确回报被跳过的推进/干预类指令（item 12），不逐条重复阻塞文案
@@ -7198,6 +7201,19 @@ def cmd(command):
         outputs.append(note)
     save_state(_STATE)
     return "\n\n".join(outputs)
+
+
+def _take_human_notices(state):
+    """取出人类协作结果，供小机下一次有效指令只弹一次。"""
+    notices = state.get("pending_human_notices")
+    if not isinstance(notices, list):
+        state["pending_human_notices"] = []
+        return []
+    lines = [item.strip() for item in notices if isinstance(item, str) and item.strip()]
+    state["pending_human_notices"] = []
+    if not lines:
+        return []
+    return ["🤝 人类协作\n" + "\n".join(lines)]
 
 
 CHOOSE_VERBS = ("choose", "选择", "选", "决定")
@@ -8535,6 +8551,23 @@ _HUMAN_ACTIONS = {
 }
 
 
+def _human_action_notice(action, result):
+    """把人类前端的完成结果改写成给小机的协作通知。"""
+    if action == "catch_snail" and result.get("summary", {}).get("prevented"):
+        lead = "你的人类帮你清理了岸边的福寿螺卵块"
+    else:
+        lead = {
+            "expel_turtle": "你的人类帮你驱赶了巴西龟",
+            "catch_snail": "你的人类帮你捞走了福寿螺",
+            "pull_hyacinth": "你的人类帮你拔除了水葫芦",
+            "hunt_rat": "你的人类帮你打退了田鼠",
+            "skim_algae": "你的人类帮你捞走了水面的浮藻",
+            "crack_ice": "你的人类帮你尝试了凿冰",
+        }.get(action, "你的人类帮你处理了池塘里的麻烦")
+    message = result.get("message")
+    return "%s：%s" % (lead, message) if message else lead + "。"
+
+
 def human_action(state, action, payload=None):
     """人类前端参与灾害的统一入口：一次前端小游戏的结果上报。
 
@@ -8557,6 +8590,9 @@ def human_action(state, action, payload=None):
     result["action"] = action
     if result.get("ok"):
         result["events"] = events
+        notice = _human_action_notice(action, result)
+        state.setdefault("pending_human_notices", []).append(notice)
+        _chronicle(state, notice)
     return result
 
 

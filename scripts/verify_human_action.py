@@ -416,6 +416,49 @@ def test_once_rejections_and_help_texts():
           and all("你的人类可以在前端帮忙" in text for text in hints.values()))
 
 
+def test_human_result_notice_and_chronicle():
+    expected_leads = {
+        "expel_turtle": "你的人类帮你驱赶了巴西龟",
+        "catch_snail": "你的人类帮你捞走了福寿螺",
+        "pull_hyacinth": "你的人类帮你拔除了水葫芦",
+        "hunt_rat": "你的人类帮你打退了田鼠",
+        "skim_algae": "你的人类帮你捞走了水面的浮藻",
+        "crack_ice": "你的人类帮你尝试了凿冰",
+    }
+    check("六种人类协作都有对应的小机文案",
+          all(engine._human_action_notice(
+              action, {"message": "完成。", "summary": {}}
+          ).startswith(lead + "：完成。")
+              for action, lead in expected_leads.items()))
+    check("福寿螺卵块预防有独立小机文案",
+          engine._human_action_notice(
+              "catch_snail", {"message": "完成。", "summary": {"prevented": True}}
+          ).startswith("你的人类帮你清理了岸边的福寿螺卵块："))
+
+    s = base_state(turn=20)
+    s["flags"]["apple_snail"] = {"status": "active", "count": 2,
+                                     "human_helped": False}
+    result = call(s, "catch_snail", {"count": 2})
+    notices = s["pending_human_notices"]
+    check("人类协作成功后生成给小机的待读通知",
+          result["ok"] and len(notices) == 1
+          and notices[0].startswith("你的人类帮你捞走了福寿螺：")
+          and result["message"] in notices[0])
+    check("人类协作通知同步写入年鉴",
+          s["chronicle"][-1].endswith(notices[0]))
+    first = engine._take_human_notices(s)
+    second = engine._take_human_notices(s)
+    check("小机通知只消费一次",
+          len(first) == 1 and "🤝 人类协作" in first[0]
+          and notices[0] in first[0] and second == [])
+
+    rejected = base_state(turn=20)
+    failed = call(rejected, "catch_snail", {"count": 2})
+    check("人类协作失败不生成通知或年鉴",
+          not failed["ok"] and rejected["pending_human_notices"] == []
+          and rejected["chronicle"] == [])
+
+
 def test_api_state_frontend_triggers():
     """正式前端只读 api_state；六种入口所需字段必须都投影出去。"""
     quiet = engine.api_state(base_state())
@@ -509,6 +552,7 @@ def main():
     test_green_tide_persistent_relief_and_baseline()
     test_crack_joint_hole_and_spring_loss()
     test_once_rejections_and_help_texts()
+    test_human_result_notice_and_chronicle()
     test_api_state_frontend_triggers()
     test_old_save_compat_and_rng_inventory()
     print()

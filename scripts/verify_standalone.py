@@ -97,6 +97,14 @@ def main():
             result = store.human_action(action, payload)
             check("%s 可写回独立存档" % action, result.get("ok") is True)
             check("%s 成功后不重复开放" % action, action not in store.project("state")["available_human_actions"])
+            notice = store.command("status")
+            check("%s 完成后小机收到人类协作通知" % action,
+                  "🤝 人类协作" in notice and "你的人类帮你" in notice)
+            check("%s 人类协作通知写入年鉴" % action,
+                  any("你的人类帮你" in item
+                      for item in store.project("annals")["timeline"]))
+            check("%s 人类协作通知只弹一次" % action,
+                  "🤝 人类协作" not in store.command("status"))
 
         with store.lock:
             rat_state = disaster_cases()[3][0]

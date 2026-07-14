@@ -4,6 +4,8 @@
 
 返回成功结构为 `{"ok": true, "action", "message", "events", "summary"}`；失败结构为 `{"ok": false, "action", "error", "message"}`。通用错误包括 `unknown_action`、`bad_payload`、`not_active`、`already_helped`；凿冰同一方当天重复为 `already_today`。
 
+人类成功协作后，引擎会将前端完成文案整理为“你的人类帮你……”通知：写入 `pending_human_notices`，在小机下一次执行有效指令时附在返回文本前并一次性消费；同一条通知也写入年鉴，供之后回看。协作失败不写通知或年鉴。
+
 ## 灾内协作次数总则
 
 - 鼠患、福寿螺爆发阶段、水葫芦、绿潮：同一场灾害中，人类第一次成功提交后在该灾状态写入 `human_helped=true`；再次调用返回 `already_helped`。新一场灾害重新获得一次机会。
