@@ -8100,6 +8100,12 @@ def api_state(state):
         },
         "flags": {
             "apple_snail": copy.deepcopy(state.get("flags", {}).get("apple_snail")),
+            "ice_on": bool(state.get("flags", {}).get("ice_on")),
+            "ice_suffocation": int(state.get("flags", {}).get("ice_suffocation", 0)),
+            "ice_total_days": int(state.get("flags", {}).get("ice_total_days", 0)),
+            "ice_attempt_day": state.get("flags", {}).get("ice_attempt_day", -1),
+            "ice_human_attempted": bool(state.get("flags", {}).get("ice_human_attempted")),
+            "ice_ai_attempted": bool(state.get("flags", {}).get("ice_ai_attempted")),
         },
         "pending_choice": _json_pending_choice(state),
         "observe_text": _json_observe_text(state),
@@ -8435,8 +8441,9 @@ def _human_hunt_rat(state, payload, events):
     calm_line = rat.get("outbreak_count", before) * 0.25
     over = after <= calm_line
     summary = {"hits": int(round(applied)), "rats_left": int(after),
+               "remaining_count": int(after),
                "human_hits_total": rat["human_hits"], "calm_line": round(calm_line, 2),
-               "plague_over": over}
+               "plague_over": over, "resolved": over}
     _human_folio_note(state, "鼠患", "人类在前端帮忙打田鼠")
     if over:
         _calm_rat_plague(state)
@@ -8482,8 +8489,10 @@ def _human_skim_algae(state, payload, events):
         relief = skim_total / 50.0 * 0.3
         msg = "捞走了一些浮藻；直到绿潮结束，每天会少扣%.2f溶氧。" % relief
     _human_folio_note(state, "绿潮", "人类在前端帮忙捞藻")
-    summary = {"applied": round(applied, 2), "algae_left": _ipop(state, "水藻"),
-               "daily_do_relief": round(min(0.3, skim_total / 50.0 * 0.3), 3),
+    daily_relief = round(min(0.3, skim_total / 50.0 * 0.3), 3)
+    summary = {"applied": round(applied, 2), "amount": round(applied, 2),
+               "algae_left": _ipop(state, "水藻"),
+               "daily_do_relief": daily_relief, "hypoxia_reduction": daily_relief,
                "shortened": shortened, "ended": ended,
                "remaining_days": 0 if ended else green["remaining"],
                "human_skim_total": skim_total}
@@ -8502,9 +8511,14 @@ def _human_crack_ice(state, payload, events):
         msg = "%s成功：冰面开出洞口，并会维持三天。" % who
     else:
         msg = "%s失败：冰层只留下裂纹；如果小机今天也尝试，会用同一判定值提升到85%%。" % who
+    suffocation_days = f.get("ice_suffocation", 0)
+    frozen_days = f.get("ice_total_days", 0)
     summary = {"crack_count": f["crack_count"], "human_crack_count": f["human_crack_count"],
-               "ice_suffocation": f.get("ice_suffocation", 0),
+               "ice_suffocation": suffocation_days, "suffocation_days": suffocation_days,
+               "frozen_days": frozen_days,
+               "suffocation_ratio": (suffocation_days / frozen_days if frozen_days > 0 else 0.0),
                "success": outcome["success"], "joint_attempt": outcome["joint"],
+               "both_attempted": outcome["joint"],
                "human_attempted": f["ice_human_attempted"],
                "ai_attempted": f["ice_ai_attempted"],
                "hole_active": _chain_active(state, "ice_hole")}

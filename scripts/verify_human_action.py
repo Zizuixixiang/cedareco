@@ -416,6 +416,60 @@ def test_once_rejections_and_help_texts():
           and all("你的人类可以在前端帮忙" in text for text in hints.values()))
 
 
+def test_api_state_frontend_triggers():
+    """正式前端只读 api_state；六种入口所需字段必须都投影出去。"""
+    quiet = engine.api_state(base_state())
+    check("正式状态：无灾害时不暴露小游戏入口",
+          quiet["disasters"]["invasion"] is None
+          and quiet["disasters"]["water_hyacinth_cover"] is None
+          and not any(item["name"] in ("鼠患", "绿潮")
+                      for item in quiet["disasters"]["biological"])
+          and quiet["flags"]["ice_on"] is False
+          and quiet["flags"]["apple_snail"] is None)
+
+    s = base_state()
+    s["flags"]["brazilian_turtle"] = "active"
+    check("正式状态：巴西龟入口可识别",
+          engine.api_state(s)["disasters"]["invasion"] == "巴西龟入侵")
+
+    s = base_state()
+    s["flags"]["apple_snail"] = {"status": "active", "count": 7,
+                                     "human_helped": False}
+    snail = engine.api_state(s)
+    check("正式状态：福寿螺入口与剩余数可识别",
+          snail["disasters"]["invasion"] == "福寿螺入侵"
+          and snail["flags"]["apple_snail"]["count"] == 7)
+
+    s = base_state()
+    s["flags"]["water_hyacinth"] = {"day": 7, "cover": 0.12,
+                                        "outbreak_cover": 0.12, "human_helped": False}
+    check("正式状态：水葫芦入口可识别",
+          engine.api_state(s)["disasters"]["water_hyacinth_cover"] == 0.12)
+
+    s = base_state()
+    s["flags"].setdefault("bio_disasters", {})["鼠患"] = {"remaining": 3,
+                                                              "outbreak_count": 20,
+                                                              "human_helped": False}
+    check("正式状态：鼠患入口可识别",
+          any(item["name"] == "鼠患" for item in engine.api_state(s)["disasters"]["biological"]))
+
+    s = base_state()
+    s["flags"].setdefault("bio_disasters", {})["绿潮"] = {"remaining": 4,
+                                                              "human_helped": False,
+                                                              "human_skim_total": 0.0}
+    check("正式状态：绿潮入口可识别",
+          any(item["name"] == "绿潮" for item in engine.api_state(s)["disasters"]["biological"]))
+
+    s = base_state()
+    s["season"] = "冬"
+    s["flags"].update({"ice_on": True, "ice_suffocation": 2,
+                         "ice_total_days": 5, "ice_ai_attempted": True})
+    ice = engine.api_state(s)["flags"]
+    check("正式状态：凿冰入口与冬季进度可识别",
+          ice["ice_on"] is True and ice["ice_suffocation"] == 2
+          and ice["ice_total_days"] == 5 and ice["ice_ai_attempted"] is True)
+
+
 def test_old_save_compat_and_rng_inventory():
     s = engine.fresh_state(99)
     for key in ("ice_total_days", "ice_attempt_day", "ice_human_attempted",
@@ -455,6 +509,7 @@ def main():
     test_green_tide_persistent_relief_and_baseline()
     test_crack_joint_hole_and_spring_loss()
     test_once_rejections_and_help_texts()
+    test_api_state_frontend_triggers()
     test_old_save_compat_and_rng_inventory()
     print()
     if FAILURES:
