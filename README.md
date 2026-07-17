@@ -240,3 +240,9 @@ assets/         — 前端场景、物种与小游戏素材
 ---
 
 *一池清水。万物未生。现在，轮到你了。*
+
+## License
+
+本项目采用 [PolyForm Noncommercial License 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0)（© 2026 南山君）：个人、教育、研究与非营利用途可自由使用、修改和分发，**禁止任何商业用途**。
+
+> 注：2026-07-17 之前的历史版本曾以 MIT 发布，该等版本的既有授权不受本次变更影响；自本日起的所有版本均适用上述条款。
